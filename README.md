@@ -6,13 +6,15 @@ An MCP server paired with a browser extension that enables LLM clients, such as 
 
 The MCP server supports the following tools:
 - Open or close tabs
-- Read tab list
-- Read history
-- Read webpage text content and links
+- Get the list of opened tabs
+- Reorder opened tabs
+- Read and search the browser's history
+- Read webpages text content and links
 
 ## Example use-cases:
 
 - *"Close all non-work related tabs in my browser."*
+- *"Rearrange tabs in my browser in an order that makes sense."*
 - *"Help me find an article in my browser history about the Milford track in NZ."*
 - *"Open hackernews in my browser, then open the top story, read it, also read the comments. Do the comments agree with the story?"*
 - *"In my browser, use Google Scholar to search for papers about L-theanine in the last 3 years. Open the 3 most cited works."*

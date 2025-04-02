@@ -77,6 +77,9 @@ function initWsClient(port: number, secret: string) {
       case "get-tab-content":
         sendTabsContent(req.correlationId, req.tabId);
         break;
+      case "reorder-tabs":
+        reorderTabs(req.correlationId, req.tabOrder);
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -194,6 +197,23 @@ function initWsClient(port: number, secret: string) {
           error
         );
       });
+  }
+
+  async function reorderTabs(correlationId: string, tabOrder: number[]) {
+    // Reorder the tabs sequentially
+    for (let newIndex = 0; newIndex < tabOrder.length; newIndex++) {
+      const tabId = tabOrder[newIndex];
+      try {
+        await browser.tabs.move(tabId, { index: newIndex });
+      } catch (error) {
+        console.error(`Error moving tab ${tabId}: ${error}`);
+      }
+    }
+    sendResourceToServer({
+        resource: "tabs-reordered",
+        correlationId,
+        tabOrder,
+    });
   }
 
   // Connect to WebSocket as soon as the extension loads

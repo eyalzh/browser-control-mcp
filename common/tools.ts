@@ -26,11 +26,17 @@ export interface GetTabContentToolMessage extends ToolMessageBase {
   tabId: number;
 }
 
+export interface ReorderTabsToolMessage extends ToolMessageBase {
+  cmd: "reorder-tabs";
+  tabOrder: number[];
+}
+
 export type ToolMessage =
   | OpenTabToolMessage
   | CloseTabsToolMessage
   | GetTabListToolMessage
   | GetBrowserRecentHistoryToolMessage
-  | GetTabContentToolMessage;
+  | GetTabContentToolMessage
+  | ReorderTabsToolMessage;
 
 export type ToolMessageRequest = ToolMessage & { correlationId: string };

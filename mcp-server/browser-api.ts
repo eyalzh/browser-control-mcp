@@ -31,6 +31,7 @@ export class BrowserAPI {
     new EphemeralMap();
   private openedTabId: EphemeralMap<string, number | undefined> =
     new EphemeralMap();
+  private reorderedTabs: EphemeralMap<string, number[]> = new EphemeralMap();
 
   async init() {
     const { secret } = await readConfig();
@@ -128,6 +129,15 @@ export class BrowserAPI {
     return this.tabContent.getAndDelete(correlationId);
   }
 
+  async reorderTabs(tabOrder: number[]): Promise<number[] | undefined> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "reorder-tabs",
+      tabOrder,
+    });
+    await waitForResponse();
+    return this.reorderedTabs.getAndDelete(correlationId);
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");
@@ -170,6 +180,9 @@ export class BrowserAPI {
         break;
       case "tab-content":
         this.tabContent.set(decoded.correlationId, decoded);
+        break;
+      case "tabs-reordered":
+        this.reorderedTabs.set(decoded.correlationId, decoded.tabOrder);
         break;
       default:
         const _exhaustiveCheck: never = decoded;

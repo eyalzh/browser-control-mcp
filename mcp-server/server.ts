@@ -112,6 +112,26 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "reorder-browser-tabs",
+  "Change the order of open browser tabs",
+  { tabOrder: z.array(z.number()) },
+  async ({ tabOrder }) => {
+    const newOrder = await browserApi.reorderTabs(tabOrder);
+    if (newOrder) {
+      return {
+        content: [
+          { type: "text", text: `Tabs reordered: ${newOrder.join(", ")}` },
+        ],
+      };
+    } else {
+      return {
+        content: [{ type: "text", text: "Failed to reorder tabs" }],
+      };
+    }
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi
   .init()

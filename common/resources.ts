@@ -38,8 +38,14 @@ export interface BrowserHistoryResourceMessage extends ResourceMessageBase {
   historyItems: BrowserHistoryItem[];
 }
 
+export interface ReorderedTabsResourceMessage extends ResourceMessageBase {
+  resource: "tabs-reordered";
+  tabOrder: number[];
+}
+
 export type ResourceMessage =
   | TabContentResourceMessage
   | TabsResourceMessage
   | OpenedTabIdResourceMessage
-  | BrowserHistoryResourceMessage;
+  | BrowserHistoryResourceMessage
+  | ReorderedTabsResourceMessage;
