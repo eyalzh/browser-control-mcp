@@ -138,7 +138,7 @@ export class BrowserAPI {
   }
 
   private sendMessageToExtension(message: ToolMessage): string {
-    if (!this.ws || !this.ws.OPEN) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket is not open");
     }
 
