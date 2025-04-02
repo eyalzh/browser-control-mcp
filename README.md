@@ -27,6 +27,9 @@ npm install --prefix firefox-extension
 npm run build
 ```
 
+The final `npm run build` command should be executed in the main repository directory, as it also generates a shared `config.json` file used by both the server and the extension.
+
+
 ### Usage with Claude Desktop:
 
 Add the following configuration to `claude_desktop_config.json` (use the Edit Config button in Claude Desktop Developer settings):
@@ -51,9 +54,11 @@ Make sure to restart Claude Desktop.
 
 The browser-control-mcp extension was developed for Firefox.
 
-To install the extension, simply go to `about:debugging` in Firefox, click on "This Firefox", click on "Load Temporary Add-on...", and select the `manifest.json` file under the `firefox-extension` folder in this project.
+To install the extension:
 
-If you are already using Firefox, then *it is recommended you download a separate instance of Firefox* (e.g. Firefox Developer's edition - https://www.mozilla.org/en-US/firefox/developer/) and install the browser-control extension on it, not on your personal browser.
+1. Type `about:debugging` in the Firefox URL bar
+2. Click on "This Firefox"
+3. click on "Load Temporary Add-on..."
+4. Select the `manifest.json` file under the `firefox-extension` folder in this project
 
-While you can install the extension on your personal browser, this will expose your browsing history to the MCP client (e.g. Claude), as well as allow the client to access pages or to invoke requests with your existing browser sessions. 
-
+If you prefer not to run the extension on your personal Firefox browser, an alternative is to download a separate Firefox instance (such as Firefox Developer Edition, available at https://www.mozilla.org/en-US/firefox/developer/).

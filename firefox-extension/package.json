@@ -1,6 +1,6 @@
 {
   "name": "firefox-extension",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "main": "dist/background.js",
   "scripts": {
     "build": "esbuild background.ts --bundle --outfile=dist/background.js"

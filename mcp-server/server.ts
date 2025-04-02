@@ -5,7 +5,7 @@ import { BrowserAPI } from "./browser-api";
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.1.0",
+  version: "1.2.0",
 });
 
 mcpServer.tool(
@@ -14,7 +14,7 @@ mcpServer.tool(
   { url: z.string() },
   async ({ url }) => {
     const openedTabId = await browserApi.openTab(url);
-    if (openedTabId !== null) {
+    if (openedTabId !== undefined) {
       return {
         content: [
           {
@@ -113,7 +113,6 @@ mcpServer.tool(
 );
 
 const browserApi = new BrowserAPI();
-
 browserApi
   .init()
   .then((port) => {

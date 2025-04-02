@@ -1,10 +1,11 @@
 {
   "name": "browser-control-mcp",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "install-all": "nx run-many --target=install --all --parallel",
-    "build": "nx run-many --target=build --all --parallel"
+    "build": "nx run-many --target=build --all --parallel",
+    "postbuild": "node scripts/generate-token.js"
   },
   "devDependencies": {
     "nx": "20.6.0"

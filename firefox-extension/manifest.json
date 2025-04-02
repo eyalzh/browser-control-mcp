@@ -2,7 +2,7 @@
     "manifest_version": 2,
     "name": "Browser Control MCP",
     "version": "1.0",
-    "description": "A simple extension to control the browser given websocket messages from an MCP server",
+    "description": "A simple extension that allows a local MCP server to perform actions on the browser.",
     "permissions": [
         "tabs",
         "*://*/*",

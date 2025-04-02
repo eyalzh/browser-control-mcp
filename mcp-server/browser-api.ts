@@ -9,6 +9,9 @@ import {
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
 import EphemeralMap from "./ephemeral-map";
+import { join } from "path";
+import { readFile } from "fs/promises";
+import * as crypto from "crypto";
 
 // Support up to two initializations of the MCP server by the client
 // More initializations will result in EDADDRINUSE errors
@@ -17,6 +20,7 @@ const WS_PORTS = [8081, 8082];
 export class BrowserAPI {
   private ws: WebSocket | null = null;
   private wsServer: WebSocket.Server | null = null;
+  private sharedSecret: string | null = null;
 
   // Local state representing the resources provided by the browser extension
   // These will be updated by an inbound message from the extension
@@ -25,9 +29,16 @@ export class BrowserAPI {
     new EphemeralMap();
   private tabContent: EphemeralMap<string, TabContentResourceMessage> =
     new EphemeralMap();
-  private openedTabId: EphemeralMap<string, number> = new EphemeralMap();
+  private openedTabId: EphemeralMap<string, number | undefined> =
+    new EphemeralMap();
 
   async init() {
+    const { secret } = await readConfig();
+    if (!secret) {
+      throw new Error("Secret not found in config.json");
+    }
+    this.sharedSecret = secret;
+
     let selectedPort = null;
 
     for (const port of WS_PORTS) {
@@ -40,13 +51,21 @@ export class BrowserAPI {
       throw new Error("All available ports are in use");
     }
 
-    this.wsServer = new WebSocket.Server({ port: selectedPort });
+    this.wsServer = new WebSocket.Server({
+      host: "localhost",
+      port: selectedPort,
+    });
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
 
       this.ws.on("message", (message) => {
         const decoded = JSON.parse(message.toString());
-        this.handleDecodedResourceMessage(decoded);
+        const signature = this.createSignature(JSON.stringify(decoded.payload));
+        if (signature !== decoded.signature) {
+          console.error("Invalid message signature");
+          return;
+        }
+        this.handleDecodedResourceMessage(decoded.payload);
       });
     });
     this.wsServer.on("error", (error) => {
@@ -109,12 +128,32 @@ export class BrowserAPI {
     return this.tabContent.getAndDelete(correlationId);
   }
 
+  private createSignature(payload: string): string {
+    if (!this.sharedSecret) {
+      throw new Error("Shared secret not initialized");
+    }
+    const hmac = crypto.createHmac("sha256", this.sharedSecret);
+    hmac.update(payload);
+    return hmac.digest("hex");
+  }
+
   private sendMessageToExtension(message: ToolMessage): string {
+    if (!this.ws || !this.ws.OPEN) {
+      throw new Error("WebSocket is not open");
+    }
+
     const correlationId = Math.random().toString(36).substring(12);
     const req: ToolMessageRequest = { ...message, correlationId };
-    if (this.ws && this.ws.OPEN) {
-      this.ws.send(JSON.stringify(req));
-    }
+    const payload = JSON.stringify(req);
+    const signature = this.createSignature(payload);
+    const signedMessage = {
+      payload: req,
+      signature: signature,
+    };
+
+    // Send the signed message to the extension
+    this.ws.send(JSON.stringify(signedMessage));
+
     return correlationId;
   }
 
@@ -137,6 +176,12 @@ export class BrowserAPI {
         console.error("Invalid resource message received:", decoded);
     }
   }
+}
+
+async function readConfig() {
+  const configPath = join(__dirname, "/config.json");
+  const config = JSON.parse(await readFile(configPath, "utf8"));
+  return config;
 }
 
 async function waitForResponse() {

@@ -11,9 +11,9 @@ export interface TabContentResourceMessage extends ResourceMessageBase {
 }
 
 export interface BrowserTab {
-  id: string;
-  url: string;
-  title: string;
+  id?: number;
+  url?: string;
+  title?: string;
 }
 
 export interface TabsResourceMessage extends ResourceMessageBase {
@@ -23,13 +23,13 @@ export interface TabsResourceMessage extends ResourceMessageBase {
 
 export interface OpenedTabIdResourceMessage extends ResourceMessageBase {
   resource: "opened-tab-id";
-  tabId: number;
+  tabId: number | undefined;
 }
 
 export interface BrowserHistoryItem {
-  url: string;
-  title: string;
-  lastVisitTime: number;
+  url?: string;
+  title?: string;
+  lastVisitTime?: number;
 }
 
 export interface BrowserHistoryResourceMessage extends ResourceMessageBase {

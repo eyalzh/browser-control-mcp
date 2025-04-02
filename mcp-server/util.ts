@@ -23,7 +23,7 @@ export function isPortInUse(port: number) {
         });
       });
       
-      // Try to listen on the port
-      server.listen(port);
+      // Try to listen on the port (bind to localhost)
+      server.listen(port, 'localhost');
     });
   }
