@@ -84,7 +84,7 @@ function initWsClient(port: number, secret: string) {
   }
 
   async function sendResourceToServer(resource: ResourceMessage) {
-    if (!socket || !socket.OPEN) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       console.error("Socket is not open");
       return;
     }
