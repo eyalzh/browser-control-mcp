@@ -142,7 +142,7 @@ export class BrowserAPI {
       throw new Error("WebSocket is not open");
     }
 
-    const correlationId = Math.random().toString(36).substring(12);
+    const correlationId = Math.random().toString(36).substring(2);
     const req: ToolMessageRequest = { ...message, correlationId };
     const payload = JSON.stringify(req);
     const signature = this.createSignature(payload);
@@ -179,7 +179,7 @@ export class BrowserAPI {
 }
 
 async function readConfig() {
-  const configPath = join(__dirname, "/config.json");
+  const configPath = join(__dirname, "config.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   return config;
 }
