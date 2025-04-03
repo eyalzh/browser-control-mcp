@@ -67,7 +67,9 @@ mcpServer.tool(
   "Get the list of recent browser history (to get all, don't use searchQuery)",
   { searchQuery: z.string().optional() },
   async ({ searchQuery }) => {
-    const browserHistory = await browserApi.getBrowserRecentHistory(searchQuery);
+    const browserHistory = await browserApi.getBrowserRecentHistory(
+      searchQuery
+    );
     if (browserHistory) {
       return {
         content: browserHistory.map((item) => {
@@ -127,6 +129,29 @@ mcpServer.tool(
     } else {
       return {
         content: [{ type: "text", text: "Failed to reorder tabs" }],
+      };
+    }
+  }
+);
+
+mcpServer.tool(
+  "find-highlight-in-browser-tab",
+  "Find and highlight text in a browser tab",
+  { tabId: z.number(), queryPhrase: z.string() },
+  async ({ tabId, queryPhrase }) => {
+    const noOfResults = await browserApi.findHighlight(tabId, queryPhrase);
+    if (noOfResults !== undefined) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Number of results found and highlighted in the tab: ${noOfResults}`,
+          },
+        ],
+      };
+    } else {
+      return {
+        content: [{ type: "text", text: "Failed to find and highlight text" }],
       };
     }
   }

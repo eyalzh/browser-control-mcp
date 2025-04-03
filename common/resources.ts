@@ -43,9 +43,15 @@ export interface ReorderedTabsResourceMessage extends ResourceMessageBase {
   tabOrder: number[];
 }
 
+export interface FindHighlightResourceMessage extends ResourceMessageBase {
+  resource: "find-highlight-result";
+  noOfResults: number;
+}
+
 export type ResourceMessage =
   | TabContentResourceMessage
   | TabsResourceMessage
   | OpenedTabIdResourceMessage
   | BrowserHistoryResourceMessage
-  | ReorderedTabsResourceMessage;
+  | ReorderedTabsResourceMessage
+  | FindHighlightResourceMessage;

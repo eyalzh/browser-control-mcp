@@ -6,7 +6,8 @@
     "permissions": [
         "tabs",
         "*://*/*",
-        "history"
+        "history",
+        "find"
     ],
     "background": {
       "scripts": ["dist/background.js"]

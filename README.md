@@ -10,6 +10,7 @@ The MCP server supports the following tools:
 - Reorder opened tabs
 - Read and search the browser's history
 - Read webpages text content and links
+- Find and highlight text in a browser tab
 
 ## Example use-cases:
 

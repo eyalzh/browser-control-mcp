@@ -31,12 +31,19 @@ export interface ReorderTabsToolMessage extends ToolMessageBase {
   tabOrder: number[];
 }
 
+export interface FindHighlightToolMessage extends ToolMessageBase {
+  cmd: "find-highlight";
+  tabId: number;
+  queryPhrase: string;
+}
+
 export type ToolMessage =
   | OpenTabToolMessage
   | CloseTabsToolMessage
   | GetTabListToolMessage
   | GetBrowserRecentHistoryToolMessage
   | GetTabContentToolMessage
-  | ReorderTabsToolMessage;
+  | ReorderTabsToolMessage
+  | FindHighlightToolMessage;
 
 export type ToolMessageRequest = ToolMessage & { correlationId: string };

@@ -32,6 +32,8 @@ export class BrowserAPI {
   private openedTabId: EphemeralMap<string, number | undefined> =
     new EphemeralMap();
   private reorderedTabs: EphemeralMap<string, number[]> = new EphemeralMap();
+  private findHighlightResults: EphemeralMap<string, number> =
+    new EphemeralMap();
 
   async init() {
     const { secret } = await readConfig();
@@ -138,6 +140,19 @@ export class BrowserAPI {
     return this.reorderedTabs.getAndDelete(correlationId);
   }
 
+  async findHighlight(
+    tabId: number,
+    queryPhrase: string
+  ): Promise<number | undefined> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "find-highlight",
+      tabId,
+      queryPhrase,
+    });
+    await waitForResponse();
+    return this.findHighlightResults.getAndDelete(correlationId);
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");
@@ -168,21 +183,25 @@ export class BrowserAPI {
   }
 
   private handleDecodedResourceMessage(decoded: ResourceMessage) {
+    const { correlationId } = decoded;
     switch (decoded.resource) {
       case "tabs":
-        this.openTabs.set(decoded.correlationId, decoded.tabs);
+        this.openTabs.set(correlationId, decoded.tabs);
         break;
       case "history":
-        this.browserHistory.set(decoded.correlationId, decoded.historyItems);
+        this.browserHistory.set(correlationId, decoded.historyItems);
         break;
       case "opened-tab-id":
-        this.openedTabId.set(decoded.correlationId, decoded.tabId);
+        this.openedTabId.set(correlationId, decoded.tabId);
         break;
       case "tab-content":
-        this.tabContent.set(decoded.correlationId, decoded);
+        this.tabContent.set(correlationId, decoded);
         break;
       case "tabs-reordered":
-        this.reorderedTabs.set(decoded.correlationId, decoded.tabOrder);
+        this.reorderedTabs.set(correlationId, decoded.tabOrder);
+        break;
+      case "find-highlight-result":
+        this.findHighlightResults.set(correlationId, decoded.noOfResults);
         break;
       default:
         const _exhaustiveCheck: never = decoded;

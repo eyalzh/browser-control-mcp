@@ -1,6 +1,5 @@
 import type {
   ResourceMessage,
-  TabContentResourceMessage,
   ToolMessageRequest,
 } from "@browser-control-mcp/common";
 import { getMessageSignature } from "./auth";
@@ -79,6 +78,9 @@ function initWsClient(port: number, secret: string) {
         break;
       case "reorder-tabs":
         reorderTabs(req.correlationId, req.tabOrder);
+        break;
+      case "find-highlight":
+        findAndHighlightText(req.correlationId, req.tabId, req.queryPhrase);
         break;
       default:
         const _exhaustiveCheck: never = req;
@@ -210,9 +212,33 @@ function initWsClient(port: number, secret: string) {
       }
     }
     sendResourceToServer({
-        resource: "tabs-reordered",
-        correlationId,
-        tabOrder,
+      resource: "tabs-reordered",
+      correlationId,
+      tabOrder,
+    });
+  }
+
+  async function findAndHighlightText(
+    correlationId: string,
+    tabId: number,
+    queryPhrase: string
+  ) {
+    const findResults = await browser.find.find(queryPhrase, {
+      tabId,
+      caseSensitive: true,
+    });
+
+    // If there are results, highlight them
+    if (findResults.count > 0) {
+      browser.find.highlightResults({
+        tabId,
+      });
+    }
+
+    sendResourceToServer({
+      resource: "find-highlight-result",
+      correlationId,
+      noOfResults: findResults.count,
     });
   }
 
