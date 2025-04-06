@@ -1,4 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
@@ -154,6 +157,39 @@ mcpServer.tool(
         content: [{ type: "text", text: "Failed to find and highlight text" }],
       };
     }
+  }
+);
+
+
+mcpServer.resource(
+  "open-tab-contents",
+  new ResourceTemplate("browser://tab/{tabId}/content", {
+    list: async () => {
+      const openTabs = await browserApi.getTabList();
+      return {
+        resources: (openTabs ?? []).map((tab) => ({
+          uri: `browser://tab/${tab.id}/content`,
+          name: tab.title || tab.url || "",
+          mimeType: "text/plain",
+        })),
+      };
+    },
+  }),
+  async (uri, { tabId }) => {
+    const content = await browserApi.getTabContent(Number(tabId));
+    const listOfLinks =
+      content?.links.map((link) => `${link.text}: ${link.url}`).join("\n") ??
+      "";
+    const fullText = content?.fullText ?? "";
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/plain",
+          text: `Webpage text: \n\n${fullText} \n\nWeb page Links:\n${listOfLinks}`,
+        },
+      ],
+    };
   }
 );
 

@@ -1,6 +1,6 @@
 # Browser Control MCP
 
-An MCP server paired with a browser extension that enables LLM clients, such as Claude Desktop, to control the user's local browser (Firefox).
+An MCP server paired with a browser extension that enables LLM clients, such as Claude Desktop, to control the user's local browser (e.g. Firefox).
 
 ## Features
 
@@ -12,6 +12,9 @@ The MCP server supports the following tools:
 - Read webpages text content and links
 - Find and highlight text in a browser tab
 
+In addition, the contents of each opened tab in the browser is available as an MCP resource, allowing the user
+to select browser tabs in the MCP client itself (e.g. Claude) and load their content into the context.
+
 ## Example use-cases:
 
 - *"Close all non-work related tabs in my browser."*
@@ -22,7 +25,7 @@ The MCP server supports the following tools:
 
 ## Installation
 
-Clone this repository, then run the following commands to build both the MCP server and the browser extension.
+Clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
 npm install
 npm install --prefix mcp-server
@@ -30,7 +33,7 @@ npm install --prefix firefox-extension
 npm run build
 ```
 
-The final `npm run build` command should be executed in the main repository directory, as it also generates a shared `config.json` file used by both the server and the extension.
+The final `npm run build` command will also generate a shared secret between the MCP server and the extension.
 
 
 ### Usage with Claude Desktop:
