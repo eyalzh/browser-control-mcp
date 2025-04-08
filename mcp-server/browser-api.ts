@@ -8,7 +8,6 @@ import {
   ServerMessageRequest,
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
-import EphemeralMap from "./ephemeral-map";
 import { join } from "path";
 import { readFile } from "fs/promises";
 import * as crypto from "crypto";
@@ -16,24 +15,24 @@ import * as crypto from "crypto";
 // Support up to two initializations of the MCP server by the client
 // More initializations will result in EDADDRINUSE errors
 const WS_PORTS = [8081, 8082];
+const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
+
+interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
+  resource: T;
+  resolve: (value: Extract<ExtensionMessage, { resource: T }>) => void;
+}
 
 export class BrowserAPI {
   private ws: WebSocket | null = null;
   private wsServer: WebSocket.Server | null = null;
   private sharedSecret: string | null = null;
 
-  // Local state representing the resources provided by the browser extension
-  // These will be updated by an inbound message from the extension
-  private openTabs: EphemeralMap<string, BrowserTab[]> = new EphemeralMap();
-  private browserHistory: EphemeralMap<string, BrowserHistoryItem[]> =
-    new EphemeralMap();
-  private tabContent: EphemeralMap<string, TabContentExtensionMessage> =
-    new EphemeralMap();
-  private openedTabId: EphemeralMap<string, number | undefined> =
-    new EphemeralMap();
-  private reorderedTabs: EphemeralMap<string, number[]> = new EphemeralMap();
-  private findHighlightResults: EphemeralMap<string, number> =
-    new EphemeralMap();
+  // Map to persist the request to the extension. It maps the request correlationId
+  // to a resolver, fulfulling a promise created when sending a message to the extension.
+  private extensionRequestMap: Map<
+    string,
+    ExtensionRequestResolver<ExtensionMessage["resource"]>
+  > = new Map();
 
   async init() {
     const { secret } = await readConfig();
@@ -90,8 +89,8 @@ export class BrowserAPI {
       cmd: "open-tab",
       url,
     });
-    await waitForResponse();
-    return this.openedTabId.getAndDelete(correlationId);
+    const message = await this.waitForResponse(correlationId, "opened-tab-id");
+    return message.tabId;
   }
 
   async closeTabs(tabIds: number[]) {
@@ -105,8 +104,8 @@ export class BrowserAPI {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-tab-list",
     });
-    await waitForResponse();
-    return this.openTabs.getAndDelete(correlationId);
+    const message = await this.waitForResponse(correlationId, "tabs");
+    return message.tabs;
   }
 
   async getBrowserRecentHistory(
@@ -116,8 +115,8 @@ export class BrowserAPI {
       cmd: "get-browser-recent-history",
       searchQuery,
     });
-    await waitForResponse();
-    return this.browserHistory.getAndDelete(correlationId);
+    const message = await this.waitForResponse(correlationId, "history");
+    return message.historyItems;
   }
 
   async getTabContent(
@@ -127,8 +126,7 @@ export class BrowserAPI {
       cmd: "get-tab-content",
       tabId,
     });
-    await waitForResponse();
-    return this.tabContent.getAndDelete(correlationId);
+    return await this.waitForResponse(correlationId, "tab-content");
   }
 
   async reorderTabs(tabOrder: number[]): Promise<number[] | undefined> {
@@ -136,8 +134,8 @@ export class BrowserAPI {
       cmd: "reorder-tabs",
       tabOrder,
     });
-    await waitForResponse();
-    return this.reorderedTabs.getAndDelete(correlationId);
+    const message = await this.waitForResponse(correlationId, "tabs-reordered");
+    return message.tabOrder;
   }
 
   async findHighlight(
@@ -149,8 +147,11 @@ export class BrowserAPI {
       tabId,
       queryPhrase,
     });
-    await waitForResponse();
-    return this.findHighlightResults.getAndDelete(correlationId);
+    const message = await this.waitForResponse(
+      correlationId,
+      "find-highlight-result"
+    );
+    return message.noOfResults;
   }
 
   private createSignature(payload: string): string {
@@ -184,29 +185,31 @@ export class BrowserAPI {
 
   private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
     const { correlationId } = decoded;
-    switch (decoded.resource) {
-      case "tabs":
-        this.openTabs.set(correlationId, decoded.tabs);
-        break;
-      case "history":
-        this.browserHistory.set(correlationId, decoded.historyItems);
-        break;
-      case "opened-tab-id":
-        this.openedTabId.set(correlationId, decoded.tabId);
-        break;
-      case "tab-content":
-        this.tabContent.set(correlationId, decoded);
-        break;
-      case "tabs-reordered":
-        this.reorderedTabs.set(correlationId, decoded.tabOrder);
-        break;
-      case "find-highlight-result":
-        this.findHighlightResults.set(correlationId, decoded.noOfResults);
-        break;
-      default:
-        const _exhaustiveCheck: never = decoded;
-        console.error("Invalid resource message received:", decoded);
+    const { resolve, resource } = this.extensionRequestMap.get(correlationId)!;
+    if (resource !== decoded.resource) {
+      console.error("Resource mismatch:", resource, decoded.resource);
+      return;
     }
+    this.extensionRequestMap.delete(correlationId);
+    resolve(decoded);
+  }
+
+  private async waitForResponse<T extends ExtensionMessage["resource"]>(
+    correlationId: string,
+    resource: T
+  ): Promise<Extract<ExtensionMessage, { resource: T }>> {
+    return new Promise<Extract<ExtensionMessage, { resource: T }>>(
+      (resolve, reject) => {
+        this.extensionRequestMap.set(correlationId, {
+          resolve: resolve as (value: ExtensionMessage) => void,
+          resource,
+        });
+        setTimeout(() => {
+          this.extensionRequestMap.delete(correlationId);
+          reject();
+        }, EXTENSION_RESPONSE_TIMEOUT_MS);
+      }
+    );
   }
 }
 
@@ -214,14 +217,4 @@ async function readConfig() {
   const configPath = join(__dirname, "config.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   return config;
-}
-
-async function waitForResponse() {
-  // Wait for the extension to respond back on the same connection
-  const WAIT_TIME_MS = 200;
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(true);
-    }, WAIT_TIME_MS);
-  });
 }
