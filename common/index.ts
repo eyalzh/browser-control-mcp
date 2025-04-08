@@ -1,2 +1,2 @@
-export * from "./tools";
-export * from "./resources";
+export * from "./server-messages";
+export * from "./extension-messages";

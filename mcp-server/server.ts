@@ -99,7 +99,7 @@ mcpServer.tool(
     const content = await browserApi.getTabContent(tabId);
     if (content) {
       const links: { type: "text"; text: string }[] = content.links.map(
-        (link) => {
+        (link: { text: string; url: string }) => {
           return {
             type: "text",
             text: `Link text: ${link.text}, Link URL: ${link.url}`,
@@ -178,7 +178,7 @@ mcpServer.resource(
   async (uri, { tabId }) => {
     const content = await browserApi.getTabContent(Number(tabId));
     const listOfLinks =
-      content?.links.map((link) => `${link.text}: ${link.url}`).join("\n") ??
+      content?.links.map((link: { text: string; url: string }) => `${link.text}: ${link.url}`).join("\n") ??
       "";
     const fullText = content?.fullText ?? "";
     return {

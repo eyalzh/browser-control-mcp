@@ -1,11 +1,11 @@
 import WebSocket from "ws";
 import {
-  ResourceMessage,
+  ExtensionMessage,
   BrowserTab,
   BrowserHistoryItem,
-  ToolMessage,
-  TabContentResourceMessage,
-  ToolMessageRequest,
+  ServerMessage,
+  TabContentExtensionMessage,
+  ServerMessageRequest,
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
 import EphemeralMap from "./ephemeral-map";
@@ -27,7 +27,7 @@ export class BrowserAPI {
   private openTabs: EphemeralMap<string, BrowserTab[]> = new EphemeralMap();
   private browserHistory: EphemeralMap<string, BrowserHistoryItem[]> =
     new EphemeralMap();
-  private tabContent: EphemeralMap<string, TabContentResourceMessage> =
+  private tabContent: EphemeralMap<string, TabContentExtensionMessage> =
     new EphemeralMap();
   private openedTabId: EphemeralMap<string, number | undefined> =
     new EphemeralMap();
@@ -68,7 +68,7 @@ export class BrowserAPI {
           console.error("Invalid message signature");
           return;
         }
-        this.handleDecodedResourceMessage(decoded.payload);
+        this.handleDecodedExtensionMessage(decoded.payload);
       });
     });
     this.wsServer.on("error", (error) => {
@@ -122,7 +122,7 @@ export class BrowserAPI {
 
   async getTabContent(
     tabId: number
-  ): Promise<TabContentResourceMessage | undefined> {
+  ): Promise<TabContentExtensionMessage | undefined> {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-tab-content",
       tabId,
@@ -162,13 +162,13 @@ export class BrowserAPI {
     return hmac.digest("hex");
   }
 
-  private sendMessageToExtension(message: ToolMessage): string {
+  private sendMessageToExtension(message: ServerMessage): string {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket is not open");
     }
 
     const correlationId = Math.random().toString(36).substring(2);
-    const req: ToolMessageRequest = { ...message, correlationId };
+    const req: ServerMessageRequest = { ...message, correlationId };
     const payload = JSON.stringify(req);
     const signature = this.createSignature(payload);
     const signedMessage = {
@@ -182,7 +182,7 @@ export class BrowserAPI {
     return correlationId;
   }
 
-  private handleDecodedResourceMessage(decoded: ResourceMessage) {
+  private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
     const { correlationId } = decoded;
     switch (decoded.resource) {
       case "tabs":

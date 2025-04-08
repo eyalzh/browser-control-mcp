@@ -1,6 +1,6 @@
 import type {
-  ResourceMessage,
-  ToolMessageRequest,
+  ExtensionMessage,
+  ServerMessageRequest,
 } from "@browser-control-mcp/common";
 import { getMessageSignature } from "./auth";
 
@@ -59,7 +59,7 @@ function initWsClient(port: number, secret: string) {
     });
   }
 
-  function handleDecodedMessage(req: ToolMessageRequest) {
+  function handleDecodedMessage(req: ServerMessageRequest) {
     switch (req.cmd) {
       case "open-tab":
         openUrl(req.correlationId, req.url);
@@ -88,7 +88,7 @@ function initWsClient(port: number, secret: string) {
     }
   }
 
-  async function sendResourceToServer(resource: ResourceMessage) {
+  async function sendResourceToServer(resource: ExtensionMessage) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       console.error("Socket is not open");
       return;
