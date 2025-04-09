@@ -1,4 +1,5 @@
 # Browser Control MCP
+[![smithery badge](https://smithery.ai/badge/@eyalzh/browser-control-mcp)](https://smithery.ai/server/@eyalzh/browser-control-mcp)
 
 An MCP server paired with a browser extension that enables LLM clients, such as Claude Desktop, to control the user's local browser (Firefox).
 
@@ -33,6 +34,14 @@ to select browser tabs in the MCP client itself (e.g. Claude) and load their con
 - *"Use google search in my browser to look for flower shops. Open the 10 most relevant results. Show me a table of each flower shop with location and opening hours."*
 
 ## Installation
+
+### Installing via Smithery
+
+To install Browser Control MCP for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@eyalzh/browser-control-mcp):
+
+```bash
+npx -y @smithery/cli install @eyalzh/browser-control-mcp --client claude
+```
 
 Clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
