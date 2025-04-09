@@ -14,6 +14,7 @@ export interface BrowserTab {
   id?: number;
   url?: string;
   title?: string;
+  lastAccessed?: number;
 }
 
 export interface TabsExtensionMessage extends ExtensionMessageBase {

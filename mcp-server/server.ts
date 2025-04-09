@@ -5,6 +5,10 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
@@ -52,10 +56,16 @@ mcpServer.tool(
     const openTabs = await browserApi.getTabList();
     if (openTabs) {
       return {
-        content: openTabs.map((tab) => ({
-          type: "text",
-          text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}`,
-        })),
+        content: openTabs.map((tab) => {
+          let lastAccessed = "unknown";
+          if (tab.lastAccessed) {
+            lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
+          }
+          return {
+            type: "text",
+            text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
+          };
+        }),
       };
     } else {
       return {
@@ -76,9 +86,13 @@ mcpServer.tool(
     if (browserHistory) {
       return {
         content: browserHistory.map((item) => {
+          let lastVisited = "unknown";
+          if (item.lastVisitTime) {
+            lastVisited = dayjs(item.lastVisitTime).fromNow(); // LLM-friendly time ago
+          }
           return {
             type: "text",
-            text: `url=${item.url}, title="${item.title}", lastVisitTime=${item.lastVisitTime}`,
+            text: `url=${item.url}, title="${item.title}", lastVisitTime=${lastVisited}`,
           };
         }),
       };
@@ -160,7 +174,6 @@ mcpServer.tool(
   }
 );
 
-
 mcpServer.resource(
   "open-tab-contents",
   new ResourceTemplate("browser://tab/{tabId}/content", {
@@ -178,8 +191,11 @@ mcpServer.resource(
   async (uri, { tabId }) => {
     const content = await browserApi.getTabContent(Number(tabId));
     const listOfLinks =
-      content?.links.map((link: { text: string; url: string }) => `${link.text}: ${link.url}`).join("\n") ??
-      "";
+      content?.links
+        .map(
+          (link: { text: string; url: string }) => `${link.text}: ${link.url}`
+        )
+        .join("\n") ?? "";
     const fullText = content?.fullText ?? "";
     return {
       contents: [

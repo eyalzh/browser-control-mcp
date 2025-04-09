@@ -230,6 +230,9 @@ function initWsClient(port: number, secret: string) {
 
     // If there are results, highlight them
     if (findResults.count > 0) {
+      // But first, activate the tab. In firefox, this would also enable
+      // auto-scrolling to the highlighted result.
+      await browser.tabs.update(tabId, { active: true });
       browser.find.highlightResults({
         tabId,
       });
