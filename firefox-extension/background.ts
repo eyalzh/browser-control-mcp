@@ -74,7 +74,7 @@ function initWsClient(port: number, secret: string) {
         sendRecentHistory(req.correlationId, req.searchQuery);
         break;
       case "get-tab-content":
-        sendTabsContent(req.correlationId, req.tabId);
+        sendTabsContent(req.correlationId, req.tabId, req.offset);
         break;
       case "reorder-tabs":
         reorderTabs(req.correlationId, req.tabOrder);
@@ -103,6 +103,7 @@ function initWsClient(port: number, secret: string) {
   async function openUrl(correlationId: string, url: string) {
     if (!url.startsWith("https://")) {
       console.error("Invalid URL:", url);
+      return;
     }
 
     const tab = await browser.tabs.create({
@@ -162,7 +163,12 @@ function initWsClient(port: number, secret: string) {
       });
   }
 
-  function sendTabsContent(correlationId: string, tabId: number) {
+  function sendTabsContent(
+    correlationId: string,
+    tabId: number,
+    offset?: number
+  ) {
+    const MAX_CONTENT_LENGTH = 50_000;
     browser.tabs
       .executeScript(tabId, {
         code: `
@@ -172,24 +178,42 @@ function initWsClient(port: number, secret: string) {
           return Array.from(linkElements).map(el => ({
             url: el.href,
             text: el.innerText.trim() || el.getAttribute('aria-label') || el.getAttribute('title') || ''
-          })).filter(link => link.text !== '' && link.url !== '');
+          })).filter(link => link.text !== '' && link.url.startsWith('https://') && !link.url.includes('#'));
         }
+
+        function getTextContent() {
+          let isTruncated = false;
+          let text = document.body.innerText.substring(${offset || 0});
+          if (text.length > ${MAX_CONTENT_LENGTH}) {
+            text = text.substring(0, ${MAX_CONTENT_LENGTH});
+            isTruncated = true;
+          }
+          return {
+            text, isTruncated
+          }
+        }
+
+        const textContent = getTextContent();
 
         return {
           links: getLinks(),
-          fullText: document.body.innerText
+          fullText: textContent.text,
+          isTruncated: textContent.isTruncated,
+          totalLength: document.body.innerText.length
         };
       })();
     `,
       })
       .then(async (results) => {
-        const firstFrameResult = results[0];
+        const { isTruncated, fullText, links, totalLength } = results[0];
         await sendResourceToServer({
           resource: "tab-content",
           tabId,
           correlationId,
-          fullText: firstFrameResult.fullText,
-          links: firstFrameResult.links,
+          isTruncated,
+          fullText,
+          links,
+          totalLength,
         });
       })
       .catch((error) => {

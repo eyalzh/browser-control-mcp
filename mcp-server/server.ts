@@ -107,22 +107,43 @@ mcpServer.tool(
 
 mcpServer.tool(
   "get-tab-web-content",
-  "Get the full text content of the webpage and the list of links in the webpage, by tab ID",
-  { tabId: z.number() },
-  async ({ tabId }) => {
-    const content = await browserApi.getTabContent(tabId);
+  `
+    Get the full text content of the webpage and the list of links in the webpage, by tab ID. 
+    Use "offset" only for larger documents when the first call was truncated and if you require more content in order to assist the user.
+  `,
+  { tabId: z.number(), offset: z.number().default(0) },
+  async ({ tabId, offset }) => {
+    const content = await browserApi.getTabContent(tabId, offset);
     if (content) {
-      const links: { type: "text"; text: string }[] = content.links.map(
-        (link: { text: string; url: string }) => {
+
+      let links: { type: "text"; text: string }[] = [];
+      if (offset === 0) {
+        // Only inclue the links if offset is 0 (default value). Otherwise, we can
+        // assume this is not the first call. Adding the links again would be redundant.
+        links = content.links.map((link: { text: string; url: string }) => {
           return {
             type: "text",
+
             text: `Link text: ${link.text}, Link URL: ${link.url}`,
           };
-        }
-      );
+        });
+      }
+
+      let text = content.fullText;
+      let hint: { type: "text"; text: string }[] = [];
+      if (content.isTruncated || offset > 0) {
+        // If the content is truncated, add a "tip" suggesting
+        // that another tool, search in page, can be used to
+        // discover additional data.
+        const rangeString = `${offset}-${offset + text.length}`;
+        hint = [{type: "text", text: `The following text content is truncated due to size (includes character range ${rangeString} out of ${content.totalLength}). ` +
+          "If you want to read characters beyond this range, please use the 'get-tab-web-content' tool with an offset. "}]
+      }
+
       return {
-        content: [...links, { type: "text", text: content.fullText }],
+        content: [...hint, { type: "text", text }, ...links],
       };
+
     } else {
       return {
         content: [{ type: "text", text: "No content found" }],
@@ -153,7 +174,7 @@ mcpServer.tool(
 
 mcpServer.tool(
   "find-highlight-in-browser-tab",
-  "Find and highlight text in a browser tab",
+  "Find and highlight text in a browser tab (use a query phrase that exists in the web content)",
   { tabId: z.number(), queryPhrase: z.string() },
   async ({ tabId, queryPhrase }) => {
     const noOfResults = await browserApi.findHighlight(tabId, queryPhrase);
@@ -189,7 +210,7 @@ mcpServer.resource(
     },
   }),
   async (uri, { tabId }) => {
-    const content = await browserApi.getTabContent(Number(tabId));
+    const content = await browserApi.getTabContent(Number(tabId), 0);
     const listOfLinks =
       content?.links
         .map(

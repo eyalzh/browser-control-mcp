@@ -7,6 +7,8 @@ export interface TabContentExtensionMessage extends ExtensionMessageBase {
   resource: "tab-content";
   tabId: number;
   fullText: string;
+  isTruncated: boolean;
+  totalLength: number;
   links: { url: string; text: string }[];
 }
 

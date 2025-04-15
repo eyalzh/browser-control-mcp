@@ -120,11 +120,13 @@ export class BrowserAPI {
   }
 
   async getTabContent(
-    tabId: number
+    tabId: number,
+    offset: number,
   ): Promise<TabContentExtensionMessage | undefined> {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-tab-content",
       tabId,
+      offset,
     });
     return await this.waitForResponse(correlationId, "tab-content");
   }

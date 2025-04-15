@@ -24,6 +24,7 @@ export interface GetBrowserRecentHistoryServerMessage extends ServerMessageBase 
 export interface GetTabContentServerMessage extends ServerMessageBase {
   cmd: "get-tab-content";
   tabId: number;
+  offset?: number;
 }
 
 export interface ReorderTabsServerMessage extends ServerMessageBase {
