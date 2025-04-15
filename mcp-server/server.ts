@@ -118,7 +118,7 @@ mcpServer.tool(
 
       let links: { type: "text"; text: string }[] = [];
       if (offset === 0) {
-        // Only inclue the links if offset is 0 (default value). Otherwise, we can
+        // Only include the links if offset is 0 (default value). Otherwise, we can
         // assume this is not the first call. Adding the links again would be redundant.
         links = content.links.map((link: { text: string; url: string }) => {
           return {
