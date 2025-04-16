@@ -6,6 +6,7 @@ import {
   ServerMessage,
   TabContentExtensionMessage,
   ServerMessageRequest,
+  ExtensionError,
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
 import { join } from "path";
@@ -20,6 +21,7 @@ const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
   resolve: (value: Extract<ExtensionMessage, { resource: T }>) => void;
+  reject: (reason?: string) => void;
 }
 
 export class BrowserAPI {
@@ -62,6 +64,10 @@ export class BrowserAPI {
 
       this.ws.on("message", (message) => {
         const decoded = JSON.parse(message.toString());
+        if (isErrorMessage(decoded)) {
+          this.handleExtensionError(decoded);
+          return;
+        }
         const signature = this.createSignature(JSON.stringify(decoded.payload));
         if (signature !== decoded.signature) {
           console.error("Invalid message signature");
@@ -94,13 +100,14 @@ export class BrowserAPI {
   }
 
   async closeTabs(tabIds: number[]) {
-    this.sendMessageToExtension({
+    const correlationId = this.sendMessageToExtension({
       cmd: "close-tabs",
       tabIds,
     });
+    await this.waitForResponse(correlationId, "tabs-closed");
   }
 
-  async getTabList(): Promise<BrowserTab[] | undefined> {
+  async getTabList(): Promise<BrowserTab[]> {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-tab-list",
     });
@@ -110,7 +117,7 @@ export class BrowserAPI {
 
   async getBrowserRecentHistory(
     searchQuery?: string
-  ): Promise<BrowserHistoryItem[] | undefined> {
+  ): Promise<BrowserHistoryItem[]> {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-browser-recent-history",
       searchQuery,
@@ -121,8 +128,8 @@ export class BrowserAPI {
 
   async getTabContent(
     tabId: number,
-    offset: number,
-  ): Promise<TabContentExtensionMessage | undefined> {
+    offset: number
+  ): Promise<TabContentExtensionMessage> {
     const correlationId = this.sendMessageToExtension({
       cmd: "get-tab-content",
       tabId,
@@ -131,7 +138,7 @@ export class BrowserAPI {
     return await this.waitForResponse(correlationId, "tab-content");
   }
 
-  async reorderTabs(tabOrder: number[]): Promise<number[] | undefined> {
+  async reorderTabs(tabOrder: number[]): Promise<number[]> {
     const correlationId = this.sendMessageToExtension({
       cmd: "reorder-tabs",
       tabOrder,
@@ -140,10 +147,7 @@ export class BrowserAPI {
     return message.tabOrder;
   }
 
-  async findHighlight(
-    tabId: number,
-    queryPhrase: string
-  ): Promise<number | undefined> {
+  async findHighlight(tabId: number, queryPhrase: string): Promise<number> {
     const correlationId = this.sendMessageToExtension({
       cmd: "find-highlight",
       tabId,
@@ -196,6 +200,13 @@ export class BrowserAPI {
     resolve(decoded);
   }
 
+  private handleExtensionError(decoded: ExtensionError) {
+    const { correlationId, errorMessage } = decoded;
+    const { reject } = this.extensionRequestMap.get(correlationId)!;
+    this.extensionRequestMap.delete(correlationId);
+    reject(errorMessage);
+  }
+
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
     correlationId: string,
     resource: T
@@ -205,10 +216,11 @@ export class BrowserAPI {
         this.extensionRequestMap.set(correlationId, {
           resolve: resolve as (value: ExtensionMessage) => void,
           resource,
+          reject,
         });
         setTimeout(() => {
           this.extensionRequestMap.delete(correlationId);
-          reject();
+          reject("Timed out waiting for response");
         }, EXTENSION_RESPONSE_TIMEOUT_MS);
       }
     );
@@ -219,4 +231,13 @@ async function readConfig() {
   const configPath = join(__dirname, "config.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   return config;
+}
+
+export function isErrorMessage(
+  message: any
+): message is ExtensionError {
+  return (
+    message.errorMessage !== undefined &&
+    message.correlationId !== undefined
+  );
 }

@@ -51,10 +51,20 @@ export interface FindHighlightExtensionMessage extends ExtensionMessageBase {
   noOfResults: number;
 }
 
+export interface TabsClosedExtensionMessage extends ExtensionMessageBase {
+  resource: "tabs-closed";
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
   | OpenedTabIdExtensionMessage
   | BrowserHistoryExtensionMessage
   | ReorderedTabsExtensionMessage
-  | FindHighlightExtensionMessage;
+  | FindHighlightExtensionMessage
+  | TabsClosedExtensionMessage;
+
+export interface ExtensionError {
+  correlationId: string;
+  errorMessage: string;
+}

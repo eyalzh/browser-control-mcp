@@ -31,7 +31,9 @@ mcpServer.tool(
         ],
       };
     } else {
-      return { content: [{ type: "text", text: "Failed to open tab" }] };
+      return {
+        content: [{ type: "text", text: "Failed to open tab", isError: true }],
+      };
     }
   }
 );
@@ -54,24 +56,18 @@ mcpServer.tool(
   {},
   async () => {
     const openTabs = await browserApi.getTabList();
-    if (openTabs) {
-      return {
-        content: openTabs.map((tab) => {
-          let lastAccessed = "unknown";
-          if (tab.lastAccessed) {
-            lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
-          }
-          return {
-            type: "text",
-            text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
-          };
-        }),
-      };
-    } else {
-      return {
-        content: [{ type: "text", text: "Failed to get list of open tabs" }],
-      };
-    }
+    return {
+      content: openTabs.map((tab) => {
+        let lastAccessed = "unknown";
+        if (tab.lastAccessed) {
+          lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
+        }
+        return {
+          type: "text",
+          text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
+        };
+      }),
+    };
   }
 );
 
@@ -83,7 +79,7 @@ mcpServer.tool(
     const browserHistory = await browserApi.getBrowserRecentHistory(
       searchQuery
     );
-    if (browserHistory) {
+    if (browserHistory.length > 0) {
       return {
         content: browserHistory.map((item) => {
           let lastVisited = "unknown";
@@ -114,41 +110,39 @@ mcpServer.tool(
   { tabId: z.number(), offset: z.number().default(0) },
   async ({ tabId, offset }) => {
     const content = await browserApi.getTabContent(tabId, offset);
-    if (content) {
+    let links: { type: "text"; text: string }[] = [];
+    if (offset === 0) {
+      // Only include the links if offset is 0 (default value). Otherwise, we can
+      // assume this is not the first call. Adding the links again would be redundant.
+      links = content.links.map((link: { text: string; url: string }) => {
+        return {
+          type: "text",
 
-      let links: { type: "text"; text: string }[] = [];
-      if (offset === 0) {
-        // Only include the links if offset is 0 (default value). Otherwise, we can
-        // assume this is not the first call. Adding the links again would be redundant.
-        links = content.links.map((link: { text: string; url: string }) => {
-          return {
-            type: "text",
-
-            text: `Link text: ${link.text}, Link URL: ${link.url}`,
-          };
-        });
-      }
-
-      let text = content.fullText;
-      let hint: { type: "text"; text: string }[] = [];
-      if (content.isTruncated || offset > 0) {
-        // If the content is truncated, add a "tip" suggesting
-        // that another tool, search in page, can be used to
-        // discover additional data.
-        const rangeString = `${offset}-${offset + text.length}`;
-        hint = [{type: "text", text: `The following text content is truncated due to size (includes character range ${rangeString} out of ${content.totalLength}). ` +
-          "If you want to read characters beyond this range, please use the 'get-tab-web-content' tool with an offset. "}]
-      }
-
-      return {
-        content: [...hint, { type: "text", text }, ...links],
-      };
-
-    } else {
-      return {
-        content: [{ type: "text", text: "No content found" }],
-      };
+          text: `Link text: ${link.text}, Link URL: ${link.url}`,
+        };
+      });
     }
+
+    let text = content.fullText;
+    let hint: { type: "text"; text: string }[] = [];
+    if (content.isTruncated || offset > 0) {
+      // If the content is truncated, add a "tip" suggesting
+      // that another tool, search in page, can be used to
+      // discover additional data.
+      const rangeString = `${offset}-${offset + text.length}`;
+      hint = [
+        {
+          type: "text",
+          text:
+            `The following text content is truncated due to size (includes character range ${rangeString} out of ${content.totalLength}). ` +
+            "If you want to read characters beyond this range, please use the 'get-tab-web-content' tool with an offset. ",
+        },
+      ];
+    }
+
+    return {
+      content: [...hint, { type: "text", text }, ...links],
+    };
   }
 );
 
@@ -158,17 +152,11 @@ mcpServer.tool(
   { tabOrder: z.array(z.number()) },
   async ({ tabOrder }) => {
     const newOrder = await browserApi.reorderTabs(tabOrder);
-    if (newOrder) {
-      return {
-        content: [
-          { type: "text", text: `Tabs reordered: ${newOrder.join(", ")}` },
-        ],
-      };
-    } else {
-      return {
-        content: [{ type: "text", text: "Failed to reorder tabs" }],
-      };
-    }
+    return {
+      content: [
+        { type: "text", text: `Tabs reordered: ${newOrder.join(", ")}` },
+      ],
+    };
   }
 );
 
@@ -178,20 +166,14 @@ mcpServer.tool(
   { tabId: z.number(), queryPhrase: z.string() },
   async ({ tabId, queryPhrase }) => {
     const noOfResults = await browserApi.findHighlight(tabId, queryPhrase);
-    if (noOfResults !== undefined) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Number of results found and highlighted in the tab: ${noOfResults}`,
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [{ type: "text", text: "Failed to find and highlight text" }],
-      };
-    }
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Number of results found and highlighted in the tab: ${noOfResults}`,
+        },
+      ],
+    };
   }
 );
 
