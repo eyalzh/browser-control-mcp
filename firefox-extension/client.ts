@@ -11,6 +11,7 @@ export class WebsocketClient {
   private readonly secret: string;
   private reconnectInterval: number = 2000; // 2 seconds
   private reconnectTimer: number | null = null;
+  private messageCallback: ((data: ServerMessageRequest) => void) | null = null;
 
   constructor(port: number, secret: string) {
     this.port = port;
@@ -24,6 +25,34 @@ export class WebsocketClient {
 
     this.socket.addEventListener("open", () => {
       console.log("Connected to WebSocket server at port", this.port);
+    });
+
+    this.socket.addEventListener("close", () => {
+      this.socket = null;
+    });
+
+    this.socket.addEventListener("message", async (event) => {
+      if (!this.messageCallback) {
+        return;
+      }
+      try {
+        const signedMessage = JSON.parse(event.data);
+        const messageSig = await getMessageSignature(
+          JSON.stringify(signedMessage.payload),
+          this.secret
+        );
+        if (messageSig.length === 0 || messageSig !== signedMessage.signature) {
+          console.error("Invalid message signature");
+          await this.sendErrorToServer(
+            signedMessage.payload.correlationId,
+            "Invalid message signature - extension and server not in sync"
+          );
+          return;
+        }
+        this.messageCallback(signedMessage.payload);
+      } catch (error) {
+        console.error("Failed to parse message:", error);
+      }
     });
 
     this.socket.addEventListener("error", (event) => {
@@ -40,31 +69,7 @@ export class WebsocketClient {
   public addMessageListener(
     callback: (data: ServerMessageRequest) => void
   ): void {
-    if (!this.socket) {
-      console.error("Socket is not initialized");
-      return;
-    }
-
-    this.socket.addEventListener("message", async (event) => {
-      try {
-        const signedMessage = JSON.parse(event.data);
-        const messageSig = await getMessageSignature(
-          JSON.stringify(signedMessage.payload),
-          this.secret
-        );
-        if (messageSig.length === 0 || messageSig !== signedMessage.signature) {
-          console.error("Invalid message signature");
-          await this.sendErrorToServer(
-            signedMessage.payload.correlationId,
-            "Invalid message signature - extension and server not in sync"
-          );
-          return;
-        }
-        callback(signedMessage.payload);
-      } catch (error) {
-        console.error("Failed to parse message:", error);
-      }
-    });
+    this.messageCallback = callback;
   }
 
   private startReconnectTimer(): void {
