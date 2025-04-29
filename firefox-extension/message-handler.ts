@@ -1,5 +1,6 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
+import { isCommandAllowed } from "./extension-config";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -9,6 +10,16 @@ export class MessageHandler {
   }
 
   public async handleDecodedMessage(req: ServerMessageRequest): Promise<void> {
+    // Check if the command is allowed based on tool permissions
+    const isAllowed = await isCommandAllowed(req.cmd);
+    if (!isAllowed) {
+      await this.client.sendErrorToServer(
+        req.correlationId,
+        `Command '${req.cmd}' is disabled in extension settings`
+      );
+      return;
+    }
+
     switch (req.cmd) {
       case "open-tab":
         await this.openUrl(req.correlationId, req.url);

@@ -37,9 +37,9 @@ export class BrowserAPI {
   > = new Map();
 
   async init() {
-    const { secret } = await readConfig();
+    const { secret } = readConfig();
     if (!secret) {
-      throw new Error("Secret not found in config.json");
+      throw new Error("EXTENSION_SECRET env var missing. See the extension's options page.");
     }
     this.sharedSecret = secret;
 
@@ -227,10 +227,10 @@ export class BrowserAPI {
   }
 }
 
-async function readConfig() {
-  const configPath = join(__dirname, "config.json");
-  const config = JSON.parse(await readFile(configPath, "utf8"));
-  return config;
+function readConfig() {
+  return {
+    secret: process.env.EXTENSION_SECRET,
+  }
 }
 
 export function isErrorMessage(

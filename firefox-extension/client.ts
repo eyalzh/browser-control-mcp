@@ -31,8 +31,13 @@ export class WebsocketClient {
       this.socket = null;
     });
 
+    this.socket.addEventListener("error", (event) => {
+      console.error("WebSocket error:", event);
+      this.socket && this.socket.close();
+    });
+
     this.socket.addEventListener("message", async (event) => {
-      if (!this.messageCallback) {
+      if (this.messageCallback === null) {
         return;
       }
       try {
@@ -53,11 +58,6 @@ export class WebsocketClient {
       } catch (error) {
         console.error("Failed to parse message:", error);
       }
-    });
-
-    this.socket.addEventListener("error", (event) => {
-      console.error("WebSocket error:", event);
-      this.socket && this.socket.close();
     });
 
     // Start reconnection timer if not already running

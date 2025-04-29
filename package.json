@@ -3,9 +3,7 @@
   "version": "1.2.0",
   "private": true,
   "scripts": {
-    "install-all": "nx run-many --target=install --all --parallel",
-    "build": "nx run-many --target=build --all --parallel",
-    "postbuild": "node scripts/generate-token.js"
+    "build": "nx run-many --target=build --all --parallel"
   },
   "devDependencies": {
     "nx": "20.6.0"
