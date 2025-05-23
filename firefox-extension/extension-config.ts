@@ -215,7 +215,8 @@ export async function isDomainInDenyList(url: string): Promise<boolean> {
     
     // Check if the domain is in the deny list
     return denyList.some(deniedDomain => 
-      domain === deniedDomain || domain.endsWith(`.${deniedDomain}`)
+      domain.toLowerCase() === deniedDomain.toLowerCase() || 
+      domain.toLowerCase().endsWith(`.${deniedDomain.toLowerCase()}`)
     );
   } catch (error) {
     console.error(`Error checking domain in deny list: ${error}`);
