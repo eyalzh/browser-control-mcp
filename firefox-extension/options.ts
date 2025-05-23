@@ -5,7 +5,9 @@ import {
   getSecret, 
   AVAILABLE_TOOLS, 
   getAllToolSettings, 
-  setToolEnabled 
+  setToolEnabled,
+  getDomainDenyList,
+  setDomainDenyList
 } from "./extension-config";
 
 const secretDisplay = document.getElementById(
@@ -15,6 +17,15 @@ const copyButton = document.getElementById("copy-button") as HTMLButtonElement;
 const statusElement = document.getElementById("status") as HTMLDivElement;
 const toolSettingsContainer = document.getElementById(
   "tool-settings-container"
+) as HTMLDivElement;
+const domainDenyListTextarea = document.getElementById(
+  "domain-deny-list"
+) as HTMLTextAreaElement;
+const saveDomainListsButton = document.getElementById(
+  "save-domain-lists"
+) as HTMLButtonElement;
+const domainStatusElement = document.getElementById(
+  "domain-status"
 ) as HTMLDivElement;
 
 /**
@@ -145,31 +156,96 @@ async function handleToolToggle(event: Event) {
   
   try {
     await setToolEnabled(toolId, isEnabled);
-    
-    // Show success message
-    statusElement.textContent = `${isEnabled ? "Enabled" : "Disabled"} ${toolId}`;
-    statusElement.style.color = "#4caf50";
-    setTimeout(() => {
-      statusElement.textContent = "";
-      statusElement.style.color = "";
-    }, 3000);
+    // No status message displayed
   } catch (error) {
     console.error("Error saving tool setting:", error);
-    statusElement.textContent = "Failed to save setting";
-    statusElement.style.color = "red";
-    setTimeout(() => {
-      statusElement.textContent = "";
-      statusElement.style.color = "";
-    }, 3000);
     
     // Revert the checkbox state
     checkbox.checked = !isEnabled;
   }
 }
 
+/**
+ * Loads the domain lists from storage and displays them
+ */
+async function loadDomainLists() {
+  try {
+    // Load deny list
+    const denyList = await getDomainDenyList();
+    domainDenyListTextarea.value = denyList.join('\n');
+  } catch (error) {
+    console.error("Error loading domain lists:", error);
+    domainStatusElement.textContent = "Error loading domain lists. Please check console for details.";
+    domainStatusElement.style.color = "red";
+    setTimeout(() => {
+      domainStatusElement.textContent = "";
+      domainStatusElement.style.color = "";
+    }, 3000);
+  }
+}
+
+/**
+ * Saves the domain lists to storage
+ */
+async function saveDomainLists(event: MouseEvent) {
+  if (!event.isTrusted) {
+    return;
+  }
+  
+  try {
+    // Parse deny list (split by newlines and filter out empty lines)
+    const denyListText = domainDenyListTextarea.value.trim();
+    const denyList = denyListText ? denyListText.split('\n').map(domain => domain.trim()).filter(Boolean) : [];
+    
+    // Save to storage
+    await setDomainDenyList(denyList);
+    
+    // Show success message
+    domainStatusElement.textContent = "Domain deny list saved successfully!";
+    domainStatusElement.style.color = "#4caf50";
+    setTimeout(() => {
+      domainStatusElement.textContent = "";
+      domainStatusElement.style.color = "";
+    }, 3000);
+  } catch (error) {
+    console.error("Error saving domain lists:", error);
+    domainStatusElement.textContent = "Failed to save domain lists";
+    domainStatusElement.style.color = "red";
+    setTimeout(() => {
+      domainStatusElement.textContent = "";
+      domainStatusElement.style.color = "";
+    }, 3000);
+  }
+}
+
+/**
+ * Initializes the collapsible sections
+ */
+function initializeCollapsibleSections() {
+  const sectionHeaders = document.querySelectorAll('.section-container > h2');
+  
+  sectionHeaders.forEach(header => {
+    // Add click event listener to toggle section visibility
+    header.addEventListener('click', (event) => {
+      event.preventDefault();
+
+      // Toggle the collapsed class on the header
+      header.classList.toggle('collapsed');
+
+      // Toggle the collapsed class on the section content
+      const sectionContent = header.nextElementSibling as HTMLElement;
+      sectionContent.classList.toggle('collapsed');
+
+    });
+  });
+}
+
 // Initialize the page
 copyButton.addEventListener("click", copyToClipboard);
+saveDomainListsButton.addEventListener("click", saveDomainLists);
 document.addEventListener("DOMContentLoaded", () => {
   loadSecret();
   createToolSettingsUI();
+  loadDomainLists();
+  initializeCollapsibleSections();
 });

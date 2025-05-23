@@ -67,6 +67,7 @@ export interface ToolSettings {
 export interface ExtensionConfig {
   secret: string;
   toolSettings?: ToolSettings;
+  domainDenyList?: string[];
 }
 
 /**
@@ -176,4 +177,49 @@ export async function setToolEnabled(toolId: string, enabled: boolean): Promise<
 export async function getAllToolSettings(): Promise<ToolSettings> {
   const config = await getConfig();
   return config.toolSettings || getDefaultToolSettings();
+}
+
+/**
+ * Gets the domain deny list
+ * @returns A Promise that resolves with the domain deny list
+ */
+export async function getDomainDenyList(): Promise<string[]> {
+  const config = await getConfig();
+  return config.domainDenyList || [];
+}
+
+/**
+ * Sets the domain deny list
+ * @param domains Array of domains to deny
+ * @returns A Promise that resolves when the setting is saved
+ */
+export async function setDomainDenyList(domains: string[]): Promise<void> {
+  const config = await getConfig();
+  config.domainDenyList = domains;
+  await saveConfig(config);
+}
+
+/**
+ * Checks if a domain is in the deny list
+ * @param url The URL to check
+ * @returns A Promise that resolves with true if the domain is in the deny list, false otherwise
+ */
+export async function isDomainInDenyList(url: string): Promise<boolean> {
+  try {
+    // Extract the domain from the URL
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+    
+    // Get the deny list
+    const denyList = await getDomainDenyList();
+    
+    // Check if the domain is in the deny list
+    return denyList.some(deniedDomain => 
+      domain === deniedDomain || domain.endsWith(`.${deniedDomain}`)
+    );
+  } catch (error) {
+    console.error(`Error checking domain in deny list: ${error}`);
+    // If there's an error parsing the URL, return false
+    return false;
+  }
 }

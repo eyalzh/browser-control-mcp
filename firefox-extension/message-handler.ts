@@ -1,6 +1,6 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
-import { isCommandAllowed } from "./extension-config";
+import { isCommandAllowed, isDomainInDenyList } from "./extension-config";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -10,14 +10,9 @@ export class MessageHandler {
   }
 
   public async handleDecodedMessage(req: ServerMessageRequest): Promise<void> {
-    // Check if the command is allowed based on tool permissions
     const isAllowed = await isCommandAllowed(req.cmd);
     if (!isAllowed) {
-      await this.client.sendErrorToServer(
-        req.correlationId,
-        `Command '${req.cmd}' is disabled in extension settings`
-      );
-      return;
+      throw new Error(`Command '${req.cmd}' is disabled in extension settings`);
     }
 
     switch (req.cmd) {
@@ -58,6 +53,10 @@ export class MessageHandler {
       throw new Error("Invalid URL");
     }
 
+    if (await isDomainInDenyList(url)) {
+      throw new Error("Domain in user defined deny list");
+    }
+
     const tab = await browser.tabs.create({
       url,
     });
@@ -69,7 +68,10 @@ export class MessageHandler {
     });
   }
 
-  private async closeTabs(correlationId: string, tabIds: number[]): Promise<void> {
+  private async closeTabs(
+    correlationId: string,
+    tabIds: number[]
+  ): Promise<void> {
     await browser.tabs.remove(tabIds);
     await this.client.sendResourceToServer({
       resource: "tabs-closed",
@@ -110,6 +112,11 @@ export class MessageHandler {
     tabId: number,
     offset?: number
   ): Promise<void> {
+    const tab = await browser.tabs.get(tabId);
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error(`Domain in tab URL '${tab.url}' is in the deny list`);
+    }
+
     const MAX_CONTENT_LENGTH = 50_000;
     const results = await browser.tabs.executeScript(tabId, {
       code: `
@@ -157,7 +164,10 @@ export class MessageHandler {
     });
   }
 
-  private async reorderTabs(correlationId: string, tabOrder: number[]): Promise<void> {
+  private async reorderTabs(
+    correlationId: string,
+    tabOrder: number[]
+  ): Promise<void> {
     // Reorder the tabs sequentially
     for (let newIndex = 0; newIndex < tabOrder.length; newIndex++) {
       const tabId = tabOrder[newIndex];

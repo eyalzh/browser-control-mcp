@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Browser Control MCP Options</title>
@@ -10,21 +11,43 @@
       max-width: 800px;
       margin: 0 auto;
     }
+
     .container {
       background-color: #f9f9f9;
       border-radius: 8px;
       padding: 20px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
+
     h1 {
       color: #333;
       margin-top: 0;
     }
+
     h2 {
       margin-top: 20px;
       margin-bottom: 15px;
       color: #333;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
+
+    h2::after {
+      content: "";
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      background-image: url("assets/caret.svg");
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+
+    h2.collapsed::after {
+      transform: rotate(180deg);
+    }
+
     .section-container {
       margin-top: 20px;
       background-color: #fff;
@@ -32,6 +55,21 @@
       border-radius: 4px;
       padding: 15px;
     }
+
+    .section-content {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 2000px;
+      opacity: 1;
+      overflow: hidden;
+    }
+
+    .section-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
     .secret-value {
       font-family: monospace;
       word-break: break-all;
@@ -40,6 +78,7 @@
       border-radius: 4px;
       border: 1px solid #e0e0e0;
     }
+
     .copy-button {
       margin-top: 10px;
       background-color: #4285f4;
@@ -50,15 +89,18 @@
       cursor: pointer;
       font-size: 14px;
     }
+
     .copy-button:hover {
       background-color: #3367d6;
     }
+
     .status {
       margin-top: 10px;
       color: #4caf50;
       font-size: 14px;
       height: 20px;
     }
+
     .tool-row {
       display: flex;
       justify-content: space-between;
@@ -66,21 +108,26 @@
       padding: 10px 0;
       border-bottom: 1px solid #eee;
     }
+
     .tool-row:last-child {
       border-bottom: none;
     }
+
     .tool-label-container {
       flex: 1;
       padding-right: 20px;
     }
+
     .tool-name {
       font-weight: bold;
       margin-bottom: 5px;
     }
+
     .tool-description {
       font-size: 14px;
       color: #666;
     }
+
     /* Toggle switch styles */
     .toggle-switch {
       position: relative;
@@ -88,11 +135,13 @@
       width: 50px;
       height: 24px;
     }
+
     .toggle-switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
+
     .slider {
       position: absolute;
       cursor: pointer;
@@ -104,6 +153,7 @@
       transition: .4s;
       border-radius: 24px;
     }
+
     .slider:before {
       position: absolute;
       content: "";
@@ -115,40 +165,66 @@
       transition: .4s;
       border-radius: 50%;
     }
-    input:checked + .slider {
+
+    input:checked+.slider {
       background-color: #4285f4;
     }
-    input:focus + .slider {
+
+    input:focus+.slider {
       box-shadow: 0 0 1px #4285f4;
     }
-    input:checked + .slider:before {
+
+    input:checked+.slider:before {
       transform: translateX(26px);
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Browser Control MCP Options</h1>
     <p>Configure settings for the Browser Control MCP extension.</p>
-    
+
     <div class="section-container">
       <h2>Secret Key</h2>
-      <p>This secret key is automatically generated when the extension is installed and is used to authenticate connections to the MCP server:</p>
-      <div class="secret-value" id="secret-display">Loading...</div>
-      <button class="copy-button" id="copy-button">Copy to Clipboard</button>
-      <div class="status" id="status"></div>
+      <div class="section-content">
+        <p>This secret key is automatically generated when the extension is installed and is used to authenticate
+          connections to the MCP server:</p>
+        <div class="secret-value" id="secret-display">Loading...</div>
+        <button class="copy-button" id="copy-button">Copy to Clipboard</button>
+        <div class="status" id="status"></div>
+      </div>
     </div>
-    
+
     <div class="section-container">
       <h2>Tool Permissions</h2>
-      <p>Enable or disable specific MCP tools that can interact with your browser:</p>
-      <div id="tool-settings-container">
-        <!-- Tool settings will be dynamically inserted here -->
-        <div class="loading">Loading tool settings...</div>
+      <div class="section-content">
+        <p>Enable or disable specific MCP tools that can interact with your browser:</p>
+        <div id="tool-settings-container">
+          <!-- Tool settings will be dynamically inserted here -->
+          <div class="loading">Loading tool settings...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-container">
+      <h2 class="collapsed">Domain Filtering</h2>
+      <div class="section-content collapsed">
+        <p>Configure which domains the extension can interact with:</p>
+
+        <div class="domain-list-container" style="margin-top: 20px;">
+          <h3>Domain Deny List</h3>
+          <p>The extension will not open tabs or get content from tabs with these domains (one domain per line):</p>
+          <textarea id="domain-deny-list" rows="6" style="width: 100%; font-family: monospace;"></textarea>
+        </div>
+
+        <button id="save-domain-lists" class="copy-button" style="margin-top: 15px;">Save Domain Lists</button>
+        <div class="status" id="domain-status"></div>
       </div>
     </div>
   </div>
 
   <script src="dist/options.js"></script>
 </body>
+
 </html>
