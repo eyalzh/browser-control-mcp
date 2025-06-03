@@ -7,8 +7,40 @@ import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { promises as fs } from "fs";
+import path from "path";
+import { URL } from "url";
 
 dayjs.extend(relativeTime);
+
+function generateFilenameFromUrl(url: string): string {
+  try {
+    const parsedUrl = new URL(url);
+    // Create filename from hostname and pathname
+    let filename = parsedUrl.hostname.replace(/\./g, '_');
+    
+    // Add sanitized pathname if it exists and isn't just '/'
+    if (parsedUrl.pathname && parsedUrl.pathname !== '/') {
+      const pathname = parsedUrl.pathname
+        .replace(/^\//g, '') // Remove leading slash
+        .replace(/\/$/g, '') // Remove trailing slash
+        .replace(/[^a-zA-Z0-9-_]/g, '_'); // Replace special chars with underscore
+      if (pathname) {
+        filename += '_' + pathname;
+      }
+    }
+    
+    // Add timestamp to ensure uniqueness
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    filename += '_' + timestamp + '.txt';
+    
+    return filename;
+  } catch (error) {
+    // Fallback for invalid URLs
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    return `webpage_${timestamp}.txt`;
+  }
+}
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
@@ -209,6 +241,70 @@ mcpServer.resource(
         },
       ],
     };
+  }
+);
+
+mcpServer.tool(
+  "download-page-content",
+  "Download webpage content to a file with a meaningful filename based on URL",
+  { 
+    tabId: z.number(),
+    directory: z.string().optional().describe("Directory to save the file (defaults to current directory)")
+  },
+  async ({ tabId, directory }) => {
+    // Get tab info first to get the URL
+    const tabs = await browserApi.getTabList();
+    const tab = tabs?.find(t => t.id === tabId);
+    if (!tab) {
+      return {
+        content: [{ type: "text", text: `Tab with ID ${tabId} not found` }],
+      };
+    }
+    
+    // Get the content
+    const content = await browserApi.getTabContent(tabId, 0);
+    if (!content) {
+      return {
+        content: [{ type: "text", text: "No content found for the tab" }],
+      };
+    }
+    
+    try {
+      // Generate filename from URL
+      const filename = generateFilenameFromUrl(tab.url || 'unknown');
+      const targetDir = directory || process.cwd();
+      const filepath = path.join(targetDir, filename);
+      
+      // Prepare content with metadata
+      const fileContent = `URL: ${tab.url}
+Title: ${tab.title || 'Untitled'}
+Downloaded: ${new Date().toISOString()}
+================================================================================
+
+${content.fullText}
+
+================================================================================
+LINKS FOUND ON PAGE:
+================================================================================
+${content.links.map((link: { text: string; url: string }) => `${link.text} -> ${link.url}`).join('\n')}`;
+      
+      // Write to file
+      await fs.writeFile(filepath, fileContent, 'utf-8');
+      
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Downloaded content from ${tab.url} to ${filepath}` 
+        }],
+      };
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Failed to download content: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }],
+      };
+    }
   }
 );
 
