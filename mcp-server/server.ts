@@ -249,9 +249,10 @@ mcpServer.tool(
   "Download webpage content to a file with a meaningful filename based on URL",
   { 
     tabId: z.number(),
-    directory: z.string().optional().describe("Directory to save the file (defaults to current directory)")
+    directory: z.string().optional().describe("Directory to save the file (defaults to current directory)"),
+    fileName: z.string().optional().describe("Optional filename to save the content, otherwise generated from URL"),
   },
-  async ({ tabId, directory }) => {
+  async ({ tabId, directory, fileName }) => {
     // Get tab info first to get the URL
     const tabs = await browserApi.getTabList();
     const tab = tabs?.find(t => t.id === tabId);
@@ -271,7 +272,7 @@ mcpServer.tool(
     
     try {
       // Generate filename from URL
-      const filename = generateFilenameFromUrl(tab.url || 'unknown');
+      const filename = fileName || generateFilenameFromUrl(tab.url || 'unknown');
       const targetDir = directory || process.cwd();
       const filepath = path.join(targetDir, filename);
       
@@ -305,6 +306,122 @@ ${content.links.map((link: { text: string; url: string }) => `${link.text} -> ${
         }],
       };
     }
+  }
+);
+
+mcpServer.tool(
+  "bulk-download",
+  "Bulk download webpage content from multiple URLs to files",
+  {
+    downloads: z.array(z.object({
+      url: z.string().describe("URL to download"),
+      filename: z.string().describe("Filename to save the content")
+    })).describe("Array of URLs and filenames to download"),
+    directory: z.string().describe("Directory to save all files")
+  },
+  async ({ downloads, directory }) => {
+    const results: Array<{ url: string; filename: string; status: string; filepath?: string; error?: string }> = [];
+    
+    // Ensure directory exists
+    try {
+      await fs.mkdir(directory, { recursive: true });
+    } catch (error) {
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Failed to create directory ${directory}: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        }],
+      };
+    }
+    
+    for (const download of downloads) {
+      try {
+        // Open tab for the URL
+        const tabId = await browserApi.openTab(download.url);
+        if (tabId === undefined) {
+          results.push({
+            url: download.url,
+            filename: download.filename,
+            status: "failed",
+            error: "Failed to open tab"
+          });
+          continue;
+        }
+        
+        // Wait a bit for the page to load
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Get the content
+        const content = await browserApi.getTabContent(tabId, 0);
+        if (!content) {
+          results.push({
+            url: download.url,
+            filename: download.filename,
+            status: "failed",
+            error: "No content found"
+          });
+          // Close the tab
+          await browserApi.closeTabs([tabId]);
+          continue;
+        }
+        
+        // Get tab info for title
+        const tabs = await browserApi.getTabList();
+        const tab = tabs?.find(t => t.id === tabId);
+        
+        // Prepare content with metadata
+        const fileContent = `URL: ${download.url}
+Title: ${tab?.title || 'Untitled'}
+Downloaded: ${new Date().toISOString()}
+================================================================================
+
+${content.fullText}
+
+================================================================================
+LINKS FOUND ON PAGE:
+================================================================================
+${content.links.map((link: { text: string; url: string }) => `${link.text} -> ${link.url}`).join('\n')}`;
+        
+        // Write to file
+        const filepath = path.join(directory, download.filename);
+        await fs.writeFile(filepath, fileContent, 'utf-8');
+        
+        results.push({
+          url: download.url,
+          filename: download.filename,
+          status: "success",
+          filepath: filepath
+        });
+        
+        // Close the tab
+        await browserApi.closeTabs([tabId]);
+        
+      } catch (error) {
+        results.push({
+          url: download.url,
+          filename: download.filename,
+          status: "failed",
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    // Prepare summary
+    const successful = results.filter(r => r.status === "success").length;
+    const failed = results.filter(r => r.status === "failed").length;
+    
+    let summary = `Bulk download completed: ${successful} successful, ${failed} failed\n\n`;
+    for (const result of results) {
+      if (result.status === "success") {
+        summary += `✓ ${result.url} → ${result.filepath}\n`;
+      } else {
+        summary += `✗ ${result.url} - Error: ${result.error}\n`;
+      }
+    }
+    
+    return {
+      content: [{ type: "text", text: summary }],
+    };
   }
 );
 
