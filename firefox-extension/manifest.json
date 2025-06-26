@@ -5,10 +5,12 @@
     "description": "A simple extension that allows a local MCP server to perform actions on the browser.",
     "permissions": [
         "tabs",
-        "*://*/*",
         "history",
         "find",
         "storage"
+    ],
+    "optional_permissions": [
+        "*://*/*"
     ],
     "background": {
       "scripts": ["dist/background.js"]
