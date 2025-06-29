@@ -341,6 +341,7 @@ describe("MessageHandler", () => {
 
         const mockTab = { id: 123, url: "https://example.com" };
         (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
 
         const mockScriptResult = [
           {
@@ -359,6 +360,9 @@ describe("MessageHandler", () => {
 
         // Assert
         expect(browser.tabs.get).toHaveBeenCalledWith(123);
+        expect(browser.permissions.contains).toHaveBeenCalledWith({
+          origins: ["https://example.com/*"],
+        });
         expect(browser.tabs.executeScript).toHaveBeenCalled();
         expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
           resource: "tab-content",
@@ -403,8 +407,27 @@ describe("MessageHandler", () => {
         await expect(
           messageHandler.handleDecodedMessage(request)
         ).rejects.toThrow(
-          "Domain in tab URL 'https://example.com' is in the deny list"
+          "Domain in tab URL is in the deny list"
         );
+        expect(browser.tabs.executeScript).not.toHaveBeenCalled();
+      });
+
+      it("should throw an error if permissions are denied", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "get-tab-content",
+          tabId: 123,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 123, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(false);
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow();
         expect(browser.tabs.executeScript).not.toHaveBeenCalled();
       });
     });

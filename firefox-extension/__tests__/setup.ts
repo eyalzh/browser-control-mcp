@@ -22,7 +22,13 @@ const mockBrowser = {
     local: {
         get: jest.fn(),
     },
-  }
+  },
+  permissions: {
+    contains: jest.fn(),
+  },
+  runtime: {
+    getURL: jest.fn(),
+  },
 };
 
 // Override the global browser object

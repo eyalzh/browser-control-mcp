@@ -114,7 +114,28 @@ export class MessageHandler {
   ): Promise<void> {
     const tab = await browser.tabs.get(tabId);
     if (tab.url && (await isDomainInDenyList(tab.url))) {
-      throw new Error(`Domain in tab URL '${tab.url}' is in the deny list`);
+      throw new Error(`Domain in tab URL is in the deny list`);
+    }
+
+    let granted = true;
+    if (tab.url) {
+      const origin = new URL(tab.url).origin;
+      granted = await browser.permissions.contains({
+        origins: [`${origin}/*`],
+      });
+
+      if (!granted) {
+        // Open the options page with a URL parameter to request permission:
+        const optionsUrl = browser.runtime.getURL("options.html");
+        const urlWithParams = `${optionsUrl}?requestUrl=${encodeURIComponent(
+          tab.url
+        )}`;
+
+        await browser.tabs.create({ url: urlWithParams });
+        throw new Error(
+          `The user has not yet granted permission to access the domain "${origin}". A dialog is now being opened to request permission. If the user grants permission, you can try the request again.` 
+        );
+      }
     }
 
     const MAX_CONTENT_LENGTH = 50_000;
