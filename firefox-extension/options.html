@@ -308,12 +308,24 @@
     </div>
 
     <div class="section-container">
-      <h2>WebSocket Ports</h2>
+      <h2>WebSocket Connection</h2>
       <div class="section-content">
-        <p>Configure the WebSocket ports for MCP server connections (comma-separated list). Note: Changing this value will reload the extension.</p>
-        <input type="text" id="ports-input" placeholder="8089, 8090, 8091" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; margin-bottom: 10px;" />
-        <button class="copy-button" id="save-ports">Save Ports</button>
-        <div class="status" id="ports-status"></div>
+        <p>Configure the WebSocket host and ports for MCP server connections. Note: Changing these values will reload the extension.</p>
+        
+        <div style="margin-bottom: 15px;">
+          <label for="host-input" style="display: block; margin-bottom: 5px; font-weight: bold;">Host:</label>
+          <input type="text" id="host-input" placeholder="localhost" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;" />
+          <small style="color: #666; display: block; margin-top: 5px;">Enter the hostname or IP address of the MCP server (e.g., localhost, 192.168.1.100, example.com)</small>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label for="ports-input" style="display: block; margin-bottom: 5px; font-weight: bold;">Ports (comma-separated):</label>
+          <input type="text" id="ports-input" placeholder="8089, 8090, 8091" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;" />
+          <small style="color: #666; display: block; margin-top: 5px;">Enter one or more port numbers separated by commas</small>
+        </div>
+        
+        <button class="copy-button" id="save-connection">Save Connection Settings</button>
+        <div class="status" id="connection-status"></div>
       </div>
     </div>
 

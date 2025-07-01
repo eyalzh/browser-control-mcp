@@ -84,3 +84,31 @@ Set the EXTENSION_SECRET based on the value provided on the extension's preferen
 
 Make sure to restart Claude Desktop. It might take a few seconds for the MCP server to connect to the extension.
 
+## Remote Connection Configuration
+
+By default, the extension connects to the MCP server on `localhost`. However, you can configure it to connect to a remote MCP server:
+
+1. Open the extension preferences page (from `about:addons` in Firefox)
+2. In the "WebSocket Connection" section, enter the host (IP address or hostname) of your remote MCP server
+3. Configure the port(s) as needed
+4. Click "Save Connection Settings" - the extension will reload automatically
+
+### Security Considerations for Remote Connections
+
+When connecting to a remote MCP server:
+
+- **Use a secure network**: Only connect to MCP servers on trusted networks (e.g., your local LAN)
+- **Avoid public internet exposure**: Do not expose your MCP server directly to the public internet
+- **Consider using a VPN**: For remote access over the internet, use a VPN to secure the connection
+- **Future enhancement**: Support for secure WebSocket connections (wss://) is planned for a future update
+
+### Example Remote Configurations
+
+**Local network connection:**
+- Host: `192.168.1.100`
+- Port: `8089`
+
+**Domain-based connection:**
+- Host: `mcp-server.local`
+- Port: `8089`
+
