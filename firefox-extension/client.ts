@@ -5,12 +5,14 @@ import type {
 } from "@browser-control-mcp/common";
 import { getMessageSignature } from "./auth";
 
+const RECONNECT_INTERVAL = 2000; // 2 seconds
+
 export class WebsocketClient {
   private socket: WebSocket | null = null;
   private readonly port: number;
   private readonly secret: string;
-  private reconnectInterval: number = 2000; // 2 seconds
   private reconnectTimer: number | null = null;
+  private connectionAttempts: number = 0;
   private messageCallback: ((data: ServerMessageRequest) => void) | null = null;
 
   constructor(port: number, secret: string) {
@@ -19,21 +21,22 @@ export class WebsocketClient {
   }
 
   public connect(): void {
-    console.log("Connecting to WebSocket server");
+    console.log("Connecting to WebSocket server at port", this.port);
 
     this.socket = new WebSocket(`ws://localhost:${this.port}`);
 
     this.socket.addEventListener("open", () => {
       console.log("Connected to WebSocket server at port", this.port);
+      this.connectionAttempts = 0;
     });
 
     this.socket.addEventListener("close", () => {
-      this.socket = null;
+      console.log("WebSocket connection closed event at port", this.port);
+      this.connectionAttempts = 0;
     });
 
     this.socket.addEventListener("error", (event) => {
       console.error("WebSocket error:", event);
-      this.socket && this.socket.close();
     });
 
     this.socket.addEventListener("message", async (event) => {
@@ -74,10 +77,19 @@ export class WebsocketClient {
 
   private startReconnectTimer(): void {
     this.reconnectTimer = window.setInterval(() => {
+      if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+        this.connectionAttempts++;
+
+        if (this.connectionAttempts > 2) {
+          // Avoid long retry backoff periods by resetting the connection
+          this.socket.close();
+        }
+      }
+
       if (!this.socket || this.socket.readyState === WebSocket.CLOSED) {
         this.connect();
       }
-    }, this.reconnectInterval);
+    }, RECONNECT_INTERVAL);
   }
 
   public async sendResourceToServer(resource: ExtensionMessage): Promise<void> {
@@ -100,7 +112,7 @@ export class WebsocketClient {
     errorMessage: string
   ): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      console.error("Socket is not open");
+      console.error("Socket is not open", this.socket);
       return;
     }
     const extensionError: ExtensionError = {

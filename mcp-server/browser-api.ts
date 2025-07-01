@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import {
+import type {
   ExtensionMessage,
   BrowserTab,
   BrowserHistoryItem,
@@ -9,13 +9,9 @@ import {
   ExtensionError,
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
-import { join } from "path";
-import { readFile } from "fs/promises";
 import * as crypto from "crypto";
 
-// Support up to two initializations of the MCP server by clients
-// More initializations will result in EDADDRINUSE errors
-const WS_PORTS = [8081, 8082];
+const WS_DEFAULT_PORT = 8089;
 const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
@@ -37,27 +33,23 @@ export class BrowserAPI {
   > = new Map();
 
   async init() {
-    const { secret } = readConfig();
+    const { secret, port } = readConfig();
     if (!secret) {
-      throw new Error("EXTENSION_SECRET env var missing. See the extension's options page.");
+      throw new Error(
+        "EXTENSION_SECRET env var missing. See the extension's options page."
+      );
     }
     this.sharedSecret = secret;
 
-    let selectedPort = null;
-
-    for (const port of WS_PORTS) {
-      if (!(await isPortInUse(port))) {
-        selectedPort = port;
-        break;
-      }
-    }
-    if (!selectedPort) {
-      throw new Error("All available ports are in use");
+    if (await isPortInUse(port)) {
+      throw new Error(
+        `Configured port ${port} is already in use. Please configure a different port.`
+      );
     }
 
     this.wsServer = new WebSocket.Server({
       host: "localhost",
-      port: selectedPort,
+      port,
     });
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
@@ -79,7 +71,6 @@ export class BrowserAPI {
     this.wsServer.on("error", (error) => {
       console.error("WebSocket server error:", error);
     });
-    return selectedPort;
   }
 
   close() {
@@ -230,14 +221,14 @@ export class BrowserAPI {
 function readConfig() {
   return {
     secret: process.env.EXTENSION_SECRET,
-  }
+    port: process.env.EXTENSION_PORT
+      ? parseInt(process.env.EXTENSION_PORT, 10)
+      : WS_DEFAULT_PORT,
+  };
 }
 
-export function isErrorMessage(
-  message: any
-): message is ExtensionError {
+export function isErrorMessage(message: any): message is ExtensionError {
   return (
-    message.errorMessage !== undefined &&
-    message.correlationId !== undefined
+    message.errorMessage !== undefined && message.correlationId !== undefined
   );
 }

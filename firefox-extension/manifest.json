@@ -1,8 +1,8 @@
 {
     "manifest_version": 2,
     "name": "Browser Control MCP",
-    "version": "1.3.0",
-    "description": "A simple extension that allows a local MCP server to perform actions on the browser.",
+    "version": "1.3.1",
+    "description": "An extension that allows a local MCP server to perform actions on the browser.",
     "permissions": [
         "tabs",
         "history",

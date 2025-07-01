@@ -308,6 +308,16 @@
     </div>
 
     <div class="section-container">
+      <h2>WebSocket Ports</h2>
+      <div class="section-content">
+        <p>Configure the WebSocket ports for MCP server connections (comma-separated list). Note: Changing this value will reload the extension.</p>
+        <input type="text" id="ports-input" placeholder="8089, 8090, 8091" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; margin-bottom: 10px;" />
+        <button class="copy-button" id="save-ports">Save Ports</button>
+        <div class="status" id="ports-status"></div>
+      </div>
+    </div>
+
+    <div class="section-container">
       <h2>Tool Permissions</h2>
       <div class="section-content">
         <p>Enable or disable specific MCP tools that can interact with your browser:</p>

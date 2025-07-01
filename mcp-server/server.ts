@@ -12,7 +12,7 @@ dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.3.0",
+  version: "1.3.1",
 });
 
 mcpServer.tool(
@@ -215,9 +215,6 @@ mcpServer.resource(
 const browserApi = new BrowserAPI();
 browserApi
   .init()
-  .then((port) => {
-    console.error("Browser API initialized on port", port);
-  })
   .catch((err) => {
     console.error("Browser API init error", err);
     process.exit(1);
@@ -226,16 +223,12 @@ browserApi
 const transport = new StdioServerTransport();
 mcpServer
   .connect(transport)
-  .then(() => {
-    console.error("MCP Server running on stdio");
-  })
   .catch((err) => {
     console.error("MCP Server connection error", err);
     process.exit(1);
   });
 
 process.stdin.on("close", () => {
-  console.error("MCP Server closed");
   browserApi.close();
   mcpServer.close();
   process.exit(0);

@@ -2,8 +2,6 @@ import { WebsocketClient } from "./client";
 import { MessageHandler } from "./message-handler";
 import { getConfig, generateSecret } from "./extension-config";
 
-const WS_PORTS = [8081, 8082];
-
 function initClient(port: number, secret: string) {
   const wsClient = new WebsocketClient(port, secret);
   const messageHandler = new MessageHandler(wsClient);
@@ -39,11 +37,17 @@ async function initExtension() {
 initExtension()
   .then((config) => {
     const secret = config.secret;
+
     if (!secret) {
       console.error("Secret not found in storage - reinstall extension");
       return;
     }
-    for (const port of WS_PORTS) {
+    const portList = config.ports;
+    if (portList.length === 0) {
+      console.error("No ports configured in extension config");
+      return;
+    }
+    for (const port of portList) {
       initClient(port, secret);
     }
     console.log("Browser extension initialized");

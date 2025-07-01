@@ -1,6 +1,6 @@
 import { MessageHandler } from "../message-handler";
 import { WebsocketClient } from "../client";
-import { ServerMessageRequest } from "@browser-control-mcp/common";
+import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { ExtensionConfig } from "../extension-config";
 
 // Mock the WebsocketClient
@@ -43,6 +43,7 @@ describe("MessageHandler", () => {
         "find-highlight-in-browser-tab": true,
       },
       domainDenyList: [],
+      ports: [8089],
     };
 
     (browser.storage.local.get as jest.Mock).mockResolvedValue({
@@ -65,6 +66,7 @@ describe("MessageHandler", () => {
           "find-highlight-in-browser-tab": true,
         },
         domainDenyList: [],
+        ports: [8089],
       };
       (browser.storage.local.get as jest.Mock).mockResolvedValue({
         config: configWithDisabledOpenTab,
@@ -137,6 +139,7 @@ describe("MessageHandler", () => {
             "find-highlight-in-browser-tab": true,
           },
           domainDenyList: ["example.com", "another.com"],
+          ports: [8089],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,
@@ -169,6 +172,7 @@ describe("MessageHandler", () => {
             "find-highlight-in-browser-tab": true,
           },
           domainDenyList: ["example.com", "another.com"],
+          ports: [8089],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,
@@ -389,6 +393,7 @@ describe("MessageHandler", () => {
             "find-highlight-in-browser-tab": true,
           },
           domainDenyList: ["example.com"], // Add example.com to deny list
+          ports: [8089],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,
@@ -406,9 +411,7 @@ describe("MessageHandler", () => {
         // Act & Assert
         await expect(
           messageHandler.handleDecodedMessage(request)
-        ).rejects.toThrow(
-          "Domain in tab URL is in the deny list"
-        );
+        ).rejects.toThrow("Domain in tab URL is in the deny list");
         expect(browser.tabs.executeScript).not.toHaveBeenCalled();
       });
 

@@ -8,6 +8,8 @@ import {
   setToolEnabled,
   getDomainDenyList,
   setDomainDenyList,
+  getPorts,
+  setPorts,
 } from "./extension-config";
 
 const secretDisplay = document.getElementById(
@@ -27,6 +29,9 @@ const saveDomainListsButton = document.getElementById(
 const domainStatusElement = document.getElementById(
   "domain-status"
 ) as HTMLDivElement;
+const portsInput = document.getElementById("ports-input") as HTMLInputElement;
+const savePortsButton = document.getElementById("save-ports") as HTMLButtonElement;
+const portsStatusElement = document.getElementById("ports-status") as HTMLDivElement;
 
 /**
  * Loads the secret from storage and displays it
@@ -225,6 +230,74 @@ async function saveDomainLists(event: MouseEvent) {
 }
 
 /**
+ * Loads the ports from storage and displays them
+ */
+async function loadPorts() {
+  try {
+    const ports = await getPorts();
+    portsInput.value = ports.join(", ");
+  } catch (error) {
+    console.error("Error loading ports:", error);
+    portsStatusElement.textContent =
+      "Error loading ports. Please check console for details.";
+    portsStatusElement.style.color = "red";
+    setTimeout(() => {
+      portsStatusElement.textContent = "";
+      portsStatusElement.style.color = "";
+    }, 3000);
+  }
+}
+
+/**
+ * Saves the ports to storage
+ */
+async function savePorts(event: MouseEvent) {
+  if (!event.isTrusted) {
+    return;
+  }
+
+  try {
+    // Parse ports (split by commas and filter out empty values)
+    const portsText = portsInput.value.trim();
+    const portStrings = portsText
+      ? portsText
+          .split(",")
+          .map((port) => port.trim())
+          .filter(Boolean)
+      : [];
+
+    // Validate and convert to numbers
+    const ports: number[] = [];
+    for (const portStr of portStrings) {
+      const port = parseInt(portStr, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid port number: ${portStr}. Ports must be between 1 and 65535.`);
+      }
+      ports.push(port);
+    }
+
+    // Ensure at least one port is provided
+    if (ports.length === 0) {
+      throw new Error("At least one port must be specified.");
+    }
+
+    // Save to storage
+    await setPorts(ports);
+
+    // Reload the extension:
+    browser.runtime.reload();
+  } catch (error) {
+    console.error("Error saving ports:", error);
+    portsStatusElement.textContent = error instanceof Error ? error.message : "Failed to save ports";
+    portsStatusElement.style.color = "red";
+    setTimeout(() => {
+      portsStatusElement.textContent = "";
+      portsStatusElement.style.color = "";
+    }, 3000);
+  }
+}
+
+/**
  * Initializes the collapsible sections
  */
 function initializeCollapsibleSections() {
@@ -321,10 +394,12 @@ function hidePermissionModal() {
 // Initialize the page
 copyButton.addEventListener("click", copyToClipboard);
 saveDomainListsButton.addEventListener("click", saveDomainLists);
+savePortsButton.addEventListener("click", savePorts);
 document.addEventListener("DOMContentLoaded", () => {
   loadSecret();
   createToolSettingsUI();
   loadDomainLists();
+  loadPorts();
   initializeCollapsibleSections();
 
   // Ensure modal is hidden by default

@@ -1,6 +1,6 @@
 {
   "name": "firefox-extension",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "main": "dist/background.js",
   "scripts": {
     "build": "esbuild background.ts --bundle --outfile=dist/background.js && esbuild options.ts --bundle --outfile=dist/options.js",
@@ -8,10 +8,6 @@
   },
   "license": "MIT",
   "description": "Browser Control MCP Firefox Extension / Add-on",
-  "dependencies": {
-    "@browser-control-mcp/common": "../common",
-    "@types/firefox-webext-browser": "^120.0.4"
-  },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "esbuild": "0.25.1",
@@ -19,7 +15,9 @@
     "jest-environment-jsdom": "^29.7.0",
     "nx": "20.6.0",
     "ts-jest": "^29.3.4",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "@types/firefox-webext-browser": "^120.0.4",
+    "@browser-control-mcp/common": "../common"
   },
   "nx": {}
 }

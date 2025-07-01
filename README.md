@@ -80,7 +80,7 @@ After installing the extension, add the following configuration to `claude_deskt
 ```
 Replace `/path/to/repo` with the correct path.
 
-Set the EXTENSION_SECRET based on the value provided on the extension's preferences in the extension management page in Firefox (you can access it from `about:addons`).
+Set the EXTENSION_SECRET based on the value provided on the extension's preferences in the extension management page in Firefox (you can access it from `about:addons`). You can also set the EXTENSION_PORT environment variable to specify the port that the MCP server will use to communicate with the extension (default is 8089).
 
 Make sure to restart Claude Desktop. It might take a few seconds for the MCP server to connect to the extension.
 

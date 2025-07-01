@@ -2,6 +2,10 @@
  * Configuration management for Browser Control MCP extension
  */
 
+import { ServerMessageRequest } from "@browser-control-mcp/common/server-messages";
+
+const DEFAULT_WS_PORT = 8089;
+
 // Define all available tools with their IDs and descriptions
 export interface ToolInfo {
   id: string;
@@ -48,7 +52,7 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
 ];
 
 // Map command names to tool IDs
-export const COMMAND_TO_TOOL_ID: Record<string, string> = {
+export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "open-tab": "open-browser-tab",
   "close-tabs": "close-browser-tabs",
   "get-tab-list": "get-list-of-open-tabs",
@@ -68,6 +72,7 @@ export interface ExtensionConfig {
   secret: string;
   toolSettings?: ToolSettings;
   domainDenyList?: string[];
+  ports: number[];
 }
 
 /**
@@ -92,6 +97,10 @@ export async function getConfig(): Promise<ExtensionConfig> {
   // Initialize toolSettings if it doesn't exist
   if (!config.toolSettings) {
     config.toolSettings = getDefaultToolSettings();
+  }
+
+  if (!config.ports) {
+    config.ports = [DEFAULT_WS_PORT];
   }
   
   return config;
@@ -142,7 +151,7 @@ export async function isToolEnabled(toolId: string): Promise<boolean> {
  * @param command The command to check
  * @returns A Promise that resolves with true if the command is allowed, false otherwise
  */
-export async function isCommandAllowed(command: string): Promise<boolean> {
+export async function isCommandAllowed(command: ServerMessageRequest["cmd"]): Promise<boolean> {
   const toolId = COMMAND_TO_TOOL_ID[command];
   if (!toolId) {
     console.error(`Unknown command: ${command}`);
@@ -223,4 +232,24 @@ export async function isDomainInDenyList(url: string): Promise<boolean> {
     // If there's an error parsing the URL, return false
     return false;
   }
+}
+
+/**
+ * Gets the WebSocket ports list
+ * @returns A Promise that resolves with the ports list
+ */
+export async function getPorts(): Promise<number[]> {
+  const config = await getConfig();
+  return config.ports || [DEFAULT_WS_PORT];
+}
+
+/**
+ * Sets the WebSocket ports list
+ * @param ports Array of port numbers
+ * @returns A Promise that resolves when the setting is saved
+ */
+export async function setPorts(ports: number[]): Promise<void> {
+  const config = await getConfig();
+  config.ports = ports;
+  await saveConfig(config);
 }
