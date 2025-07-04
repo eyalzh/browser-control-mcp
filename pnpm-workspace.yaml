@@ -1,4 +1,6 @@
 packages:
-  - 'firefox-extension'
-  - 'mcp-server'
-
+  - firefox-extension
+  - mcp-server
+onlyBuiltDependencies:
+  - esbuild
+  - nx
