@@ -1,4 +1,5 @@
 # Browser Control MCP
+[![smithery badge](https://smithery.ai/badge/@eyalzh/browser-control-mcp)](https://smithery.ai/server/@eyalzh/browser-control-mcp)
 
 An MCP server paired with a browser extension that enables AI agents, such as Claude Desktop, to manage the user's local browser, to interact with open tabs and to use the browser for research and information retrieval.
 
@@ -36,6 +37,14 @@ to select browser tabs in the MCP client itself (e.g. Claude) and load their con
 The purpose of this MCP server is to provide AI agents with safe access to the user's **personal** browser. It does not support web pages modification or arbitrary scripting. By default, accessing the content of a webpage will require the user's explicit consent on the browser side, for each domain. The browser extension can also be configured to limit the actions that the MCP server can perform (in the extension's preferences page).
 
 ## Installation
+
+### Installing via Smithery
+
+To install Browser Control MCP for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@eyalzh/browser-control-mcp):
+
+```bash
+npx -y @smithery/cli install @eyalzh/browser-control-mcp --client claude
+```
 
 Clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
