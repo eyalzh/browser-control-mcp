@@ -75,6 +75,10 @@
             "description": "Change the order of open browser tabs"
         },
         {
+            "name": "group-browser-tabs",
+            "description": "Group browser tabs into a new tab group"
+        },
+        {
             "name": "find-highlight-in-browser-tab",
             "description": "Find and highlight text in a browser tab"
         }
