@@ -1,7 +1,7 @@
 {
     "dxt_version": "0.1",
     "name": "browser-control-firefox",
-    "version": "1.4",
+    "version": "1.4.0",
     "display_name": "Firefox Control",
     "description": "Control Mozilla Firefox: tabs, history and web content (privacy aware)",
     "author": {

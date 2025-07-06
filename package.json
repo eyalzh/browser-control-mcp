@@ -1,6 +1,6 @@
 {
   "name": "browser-control-mcp",
-  "version": "1.4",
+  "version": "1.4.0",
   "private": true,
   "scripts": {
     "build": "nx run-many --target=build --all --parallel"
