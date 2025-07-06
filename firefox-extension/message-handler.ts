@@ -41,6 +41,15 @@ export class MessageHandler {
           req.queryPhrase
         );
         break;
+      case "group-tabs":
+        await this.groupTabs(
+          req.correlationId,
+          req.tabIds,
+          req.isCollapsed,
+          req.groupColor as browser.tabGroups.Color,
+          req.groupTitle
+        );
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -133,7 +142,7 @@ export class MessageHandler {
 
         await browser.tabs.create({ url: urlWithParams });
         throw new Error(
-          `The user has not yet granted permission to access the domain "${origin}". A dialog is now being opened to request permission. If the user grants permission, you can try the request again.` 
+          `The user has not yet granted permission to access the domain "${origin}". A dialog is now being opened to request permission. If the user grants permission, you can try the request again.`
         );
       }
     }
@@ -225,6 +234,30 @@ export class MessageHandler {
       resource: "find-highlight-result",
       correlationId,
       noOfResults: findResults.count,
+    });
+  }
+
+  private async groupTabs(
+    correlationId: string,
+    tabIds: number[],
+    isCollapsed: boolean,
+    groupColor: browser.tabGroups.Color,
+    groupTitle: string
+  ): Promise<void> {
+    const groupId = await browser.tabs.group({
+      tabIds,
+    });
+
+    let tabGroup = await browser.tabGroups.update(groupId, {
+      collapsed: isCollapsed,
+      color: groupColor,
+      title: groupTitle,
+    });
+    
+    await this.client.sendResourceToServer({
+      resource: "new-tab-group",
+      correlationId,
+      groupId: tabGroup.id,
     });
   }
 }

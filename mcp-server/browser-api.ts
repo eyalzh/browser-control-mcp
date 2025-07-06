@@ -151,6 +151,23 @@ export class BrowserAPI {
     return message.noOfResults;
   }
 
+  async groupTabs(
+    tabIds: number[],
+    isCollapsed: boolean,
+    groupColor: string,
+    groupTitle: string
+  ): Promise<number> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "group-tabs",
+      tabIds,
+      isCollapsed,
+      groupColor,
+      groupTitle,
+    });
+    const message = await this.waitForResponse(correlationId, "new-tab-group");
+    return message.groupId;
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");

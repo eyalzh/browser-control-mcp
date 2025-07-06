@@ -12,7 +12,7 @@ dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.3.1",
+  version: "1.4",
 });
 
 mcpServer.tool(
@@ -171,6 +171,28 @@ mcpServer.tool(
         {
           type: "text",
           text: `Number of results found and highlighted in the tab: ${noOfResults}`,
+        },
+      ],
+    };
+  }
+);
+
+mcpServer.tool(
+  "group-browser-tabs",
+  "Organize opened browser tabs in a new tab group",
+  {
+    tabIds: z.array(z.number()),
+    isCollapsed: z.boolean().default(false),
+    groupColor: z.enum(["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"]).default("grey"),
+    groupTitle: z.string().default("New Group"),
+  },
+  async ({ tabIds, isCollapsed, groupColor, groupTitle }) => {
+    const groupId = await browserApi.groupTabs(tabIds, isCollapsed, groupColor, groupTitle);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Created tab group "${groupTitle}" with ${tabIds.length} tabs (group ID: ${groupId})`,
         },
       ],
     };

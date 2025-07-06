@@ -55,6 +55,11 @@ export interface TabsClosedExtensionMessage extends ExtensionMessageBase {
   resource: "tabs-closed";
 }
 
+export interface TabGroupCreatedExtensionMessage extends ExtensionMessageBase {
+  resource: "new-tab-group";
+  groupId: number;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -62,7 +67,8 @@ export type ExtensionMessage =
   | BrowserHistoryExtensionMessage
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage
-  | TabsClosedExtensionMessage;
+  | TabsClosedExtensionMessage
+  | TabGroupCreatedExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;
