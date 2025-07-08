@@ -47,12 +47,19 @@ export class BrowserAPI {
       );
     }
 
+    // Unless running in a container, bind to localhost only
+    const host = process.env.CONTAINERIZED ? "0.0.0.0" : "localhost";
+
     this.wsServer = new WebSocket.Server({
-      host: "localhost",
+      host,
       port,
     });
+
+    console.error("Starting WebSocket server on port", port);
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
+
+      console.error("WebSocket connection established on port", port);
 
       this.ws.on("message", (message) => {
         const decoded = JSON.parse(message.toString());

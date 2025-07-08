@@ -31,7 +31,7 @@ The MCP server supports the following tools:
 
 ## Comparison to web automation MCP servers
 
-The purpose of this MCP server is to provide AI agents with safe access to the user's **personal** browser. It does not support web pages modification or arbitrary scripting. By default, accessing the content of a webpage will require the user's explicit consent on the browser side, for each domain. The browser extension can also be configured to limit the actions that the MCP server can perform (in the extension's preferences page).
+The purpose of this MCP server is to provide AI agents with safe access to the user's **personal** browser. It does not support web pages modification or arbitrary scripting. By default, accessing the content of a webpage will require the user's explicit consent on the browser side, for each domain. The browser extension can also be configured to restrict the actions that the MCP server can perform (on the extension's preferences page).
 
 ## Installation
 
@@ -48,8 +48,6 @@ The extensions' options page will include a link to the Claude Desktop DXT file.
 To build from code, clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
 npm install
-npm install --prefix mcp-server
-npm install --prefix firefox-extension
 npm run build
 ```
 
@@ -65,9 +63,16 @@ To install the extension on Firefox as a Temporary Add-on:
 
 If you prefer not to run the extension on your personal Firefox browser, an alternative is to download a separate Firefox instance (such as Firefox Developer Edition, available at https://www.mozilla.org/en-US/firefox/developer/).
 
-#### Install the MCP server
-After installing the browser extension and building the code locally, add the following configuration to your mcpServers configuration. (e.g. `claude_desktop_config.json` for Claude Desktop):
-```
+
+### Usage with Claude Desktop
+
+#### Option 1: Install with .dxt file
+Claude Desktop now supports Desktop Extension packages (.dxt).
+To install this MCP server as a Desktop Extension, download and open [mcp-server-v1.4.0.dxt](https://github.com/eyalzh/browser-control-mcp/releases/download/v1.4.0/mcp-server-v1.4.0.dxt). Make sure to enable the extension after installing it.
+
+#### Option 2: Install with MCP server configuration
+After installing the browser extension, add the following configuration to your mcpServers configuration (e.g. `claude_desktop_config.json` for Claude Desktop):
+```json
 {
     "mcpServers": {
         "browser-control": {
@@ -85,6 +90,32 @@ After installing the browser extension and building the code locally, add the fo
 Replace `/path/to/repo` with the correct path.
 
 Set the EXTENSION_SECRET based on the value provided on the extension's preferences in the extension management page in Firefox (you can access it from `about:addons`). You can also set the EXTENSION_PORT environment variable to specify the port that the MCP server will use to communicate with the extension (default is 8089).
+
+Alternatively, you can use a docker-based configuration. To do so, build the mcp-server Docker image:
+```
+docker build -t browser-control-mcp .
+```
+
+and use the following configuration in mcpServers:
+
+```json
+{
+    "mcpServers": {
+        "browser-control": {
+            "command": "docker",
+            "args": [
+                "run",
+                "--rm",
+                "-i",
+                "-p", "127.0.0.1:8089:8089",
+                "-e", "EXTENSION_SECRET=<secret_from_extension>",
+                "-e", "CONTAINERIZED=true",
+                "browser-control-mcp"
+            ]
+        }
+    }
+}
+```
 
 Make sure to restart Claude Desktop. It might take a few seconds for the MCP server to connect to the extension.
 

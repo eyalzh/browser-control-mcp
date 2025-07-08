@@ -4,6 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+### Installation
+```bash
+npm install  # Install all dependencies (includes subproject dependencies)
+```
+
 ### Build
 ```bash
 npm run build  # Build all projects using nx

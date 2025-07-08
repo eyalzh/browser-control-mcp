@@ -50,4 +50,7 @@ dist
 # DXT
 *.dxt
 
+# Web extension dist
+web-ext-artifacts/
+
 .DS_Store
