@@ -55,7 +55,7 @@ export class BrowserAPI {
       port,
     });
 
-    console.error("Starting WebSocket server on port", port);
+    console.error(`Starting WebSocket server on ${host}:${port}`);
     this.wsServer.on("connection", async (connection) => {
       this.ws = connection;
 
