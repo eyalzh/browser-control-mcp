@@ -475,6 +475,7 @@ describe("MessageHandler", () => {
         const mockFindResults = { count: 5 };
         (browser.find.find as jest.Mock).mockResolvedValue(mockFindResults);
         (browser.tabs.update as jest.Mock).mockResolvedValue(undefined);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
 
         // Act
         await messageHandler.handleDecodedMessage(request);
@@ -505,7 +506,10 @@ describe("MessageHandler", () => {
         };
 
         const mockFindResults = { count: 0 };
+        const mockTab = { id: 123, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
         (browser.find.find as jest.Mock).mockResolvedValue(mockFindResults);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
 
         // Act
         await messageHandler.handleDecodedMessage(request);
@@ -518,6 +522,26 @@ describe("MessageHandler", () => {
           correlationId: "test-correlation-id",
           noOfResults: 0,
         });
+      });
+
+      it("should throw an error if permissions are denied", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "find-highlight",
+          tabId: 123,
+          queryPhrase: "test",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTab = { id: 123, url: "https://example.com" };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(false);
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow();
+        expect(browser.find.find).not.toHaveBeenCalled();
       });
     });
   });

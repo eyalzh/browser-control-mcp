@@ -116,6 +116,52 @@ export class MessageHandler {
     });
   }
 
+  // Check that the user has granted permission to access the URL's domain.
+  // This will open the options page with a URL parameter to request permission
+  // and throw an error to indicate that the request cannot proceed until permission is granted.
+  private async checkForUrlPermission(url: string | undefined): Promise<void> {
+    if (url) {
+      const origin = new URL(url).origin;
+      const granted = await browser.permissions.contains({
+        origins: [`${origin}/*`],
+      });
+
+      if (!granted) {
+        // Open the options page with a URL parameter to request permission:
+        const optionsUrl = browser.runtime.getURL("options.html");
+        const urlWithParams = `${optionsUrl}?requestUrl=${encodeURIComponent(
+          url
+        )}`;
+
+        await browser.tabs.create({ url: urlWithParams });
+        throw new Error(
+          `The user has not yet granted permission to access the domain "${origin}". A dialog is now being opened to request permission. If the user grants permission, you can try the request again.`
+        );
+      }
+    }
+  }
+
+  private async checkForGlobalPermission(permissions: string[]): Promise<void> {
+    const granted = await browser.permissions.contains({
+      permissions,
+    });
+
+    if (!granted) {
+      // Open the options page with a URL parameter to request permission:
+      const optionsUrl = browser.runtime.getURL("options.html");
+      const urlWithParams = `${optionsUrl}?requestPermissions=${encodeURIComponent(
+        JSON.stringify(permissions)
+      )}`;
+
+      await browser.tabs.create({ url: urlWithParams });
+      throw new Error(
+        `The user has not yet granted permission for the following operations: ${permissions.join(
+          ", "
+        )}. A dialog is now being opened to request permission. If the user grants permission, you can try the request again.`
+      );
+    }
+  }
+
   private async sendTabsContent(
     correlationId: string,
     tabId: number,
@@ -126,26 +172,7 @@ export class MessageHandler {
       throw new Error(`Domain in tab URL is in the deny list`);
     }
 
-    let granted = true;
-    if (tab.url) {
-      const origin = new URL(tab.url).origin;
-      granted = await browser.permissions.contains({
-        origins: [`${origin}/*`],
-      });
-
-      if (!granted) {
-        // Open the options page with a URL parameter to request permission:
-        const optionsUrl = browser.runtime.getURL("options.html");
-        const urlWithParams = `${optionsUrl}?requestUrl=${encodeURIComponent(
-          tab.url
-        )}`;
-
-        await browser.tabs.create({ url: urlWithParams });
-        throw new Error(
-          `The user has not yet granted permission to access the domain "${origin}". A dialog is now being opened to request permission. If the user grants permission, you can try the request again.`
-        );
-      }
-    }
+    await this.checkForUrlPermission(tab.url);
 
     const MAX_CONTENT_LENGTH = 50_000;
     const results = await browser.tabs.executeScript(tabId, {
@@ -161,7 +188,7 @@ export class MessageHandler {
 
         function getTextContent() {
           let isTruncated = false;
-          let text = document.body.innerText.substring(${offset || 0});
+          let text = document.body.innerText.substring(${Number(offset) || 0});
           if (text.length > ${MAX_CONTENT_LENGTH}) {
             text = text.substring(0, ${MAX_CONTENT_LENGTH});
             isTruncated = true;
@@ -215,6 +242,14 @@ export class MessageHandler {
     tabId: number,
     queryPhrase: string
   ): Promise<void> {
+    const tab = await browser.tabs.get(tabId);
+
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error(`Domain in tab URL is in the deny list`);
+    }
+
+    await this.checkForGlobalPermission(["find"]);
+
     const findResults = await browser.find.find(queryPhrase, {
       tabId,
       caseSensitive: true,
@@ -253,7 +288,7 @@ export class MessageHandler {
       color: groupColor,
       title: groupTitle,
     });
-    
+
     await this.client.sendResourceToServer({
       resource: "new-tab-group",
       correlationId,

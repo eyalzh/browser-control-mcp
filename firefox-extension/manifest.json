@@ -1,17 +1,17 @@
 {
     "manifest_version": 2,
     "name": "Browser Control MCP",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "description": "An extension that allows a local MCP server to perform actions on the browser.",
     "permissions": [
         "tabs",
         "tabGroups",
         "history",
-        "find",
         "storage"
     ],
     "optional_permissions": [
-        "*://*/*"
+        "*://*/*",
+        "find"
     ],
     "background": {
       "scripts": ["dist/background.js"]

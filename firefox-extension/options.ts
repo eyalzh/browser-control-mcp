@@ -328,9 +328,13 @@ function showPermissionRequest(url: string) {
   const domainElement = document.getElementById("permission-domain") as HTMLDivElement;
   const grantBtn = document.getElementById("grant-btn") as HTMLButtonElement;
   const cancelBtn = document.getElementById("cancel-btn") as HTMLButtonElement;
+  const permissionText = document.getElementById("permission-text") as HTMLParagraphElement;
 
   // Set the domain in the modal
   domainElement.textContent = domain;
+  
+  // Update permission text for URL permission
+  permissionText.textContent = "This will allow the extension to interact with pages on this domain as requested by the MCP server.";
 
   // Show modal and blur main content
   modal.classList.remove("hidden");
@@ -341,6 +345,63 @@ function showPermissionRequest(url: string) {
     try {
       const granted = await browser.permissions.request({
         origins: [`${origin}/*`],
+      });
+
+      if (granted) {
+        // Permission granted, close the window or redirect back
+        window.close();
+      } else {
+        // Permission denied, hide modal and show main content
+        hidePermissionModal();
+      }
+    } catch (error) {
+      console.error("Error requesting permission:", error);
+      hidePermissionModal();
+    }
+  };
+
+  // Handle cancel button click
+  const handleCancel = () => {
+    hidePermissionModal();
+  };
+
+  // Add event listeners
+  grantBtn.addEventListener("click", handleGrant);
+  cancelBtn.addEventListener("click", handleCancel);
+
+  // Store references to remove listeners later
+  (window as any).permissionHandlers = {
+    handleGrant,
+    handleCancel,
+    grantBtn,
+    cancelBtn
+  };
+}
+
+function showGlobalPermissionRequest(permissions: string[]) {
+  // Show the modal and hide the main content
+  const modal = document.getElementById("permission-modal") as HTMLDivElement;
+  const mainContent = document.getElementById("main-content") as HTMLDivElement;
+  const domainElement = document.getElementById("permission-domain") as HTMLDivElement;
+  const grantBtn = document.getElementById("grant-btn") as HTMLButtonElement;
+  const cancelBtn = document.getElementById("cancel-btn") as HTMLButtonElement;
+  const permissionText = document.getElementById("permission-text") as HTMLParagraphElement;
+
+  // Set the permissions in the modal
+  domainElement.textContent = permissions.join(", ");
+  
+  // Update permission text for global permissions
+  permissionText.textContent = "This will allow the extension to use these browser capabilities as requested by the MCP server.";
+
+  // Show modal and blur main content
+  modal.classList.remove("hidden");
+  mainContent.classList.add("modal-open");
+
+  // Handle grant permission button click
+  const handleGrant = async () => {
+    try {
+      const granted = await browser.permissions.request({
+        permissions: permissions as browser.permissions.Permissions["permissions"],
       });
 
       if (granted) {
@@ -410,9 +471,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const params = new URLSearchParams(window.location.search);
   const requestUrl = params.get("requestUrl");
+  const requestPermissions = params.get("requestPermissions");
 
   if (requestUrl) {
     // Show UI for requesting permission for this specific URL
     showPermissionRequest(requestUrl);
+  } else if (requestPermissions) {
+    // Show UI for requesting global permissions
+    try {
+      const permissions = JSON.parse(decodeURIComponent(requestPermissions));
+      showGlobalPermissionRequest(permissions);
+    } catch (error) {
+      console.error("Error parsing requestPermissions:", error);
+    }
   }
 });
