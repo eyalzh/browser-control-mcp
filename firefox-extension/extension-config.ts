@@ -74,6 +74,7 @@ export interface ExtensionConfig {
   toolSettings?: ToolSettings;
   domainDenyList?: string[];
   ports: number[];
+  host?: string;
 }
 
 /**
@@ -102,6 +103,10 @@ export async function getConfig(): Promise<ExtensionConfig> {
 
   if (!config.ports) {
     config.ports = [DEFAULT_WS_PORT];
+  }
+
+  if (!config.host) {
+    config.host = "localhost";
   }
   
   return config;
@@ -252,5 +257,25 @@ export async function getPorts(): Promise<number[]> {
 export async function setPorts(ports: number[]): Promise<void> {
   const config = await getConfig();
   config.ports = ports;
+  await saveConfig(config);
+}
+
+/**
+ * Gets the WebSocket host
+ * @returns A Promise that resolves with the host
+ */
+export async function getHost(): Promise<string> {
+  const config = await getConfig();
+  return config.host || "localhost";
+}
+
+/**
+ * Sets the WebSocket host
+ * @param host The host to connect to
+ * @returns A Promise that resolves when the setting is saved
+ */
+export async function setHost(host: string): Promise<void> {
+  const config = await getConfig();
+  config.host = host;
   await saveConfig(config);
 }

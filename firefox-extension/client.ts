@@ -9,29 +9,31 @@ const RECONNECT_INTERVAL = 2000; // 2 seconds
 
 export class WebsocketClient {
   private socket: WebSocket | null = null;
+  private readonly host: string;
   private readonly port: number;
   private readonly secret: string;
   private reconnectTimer: number | null = null;
   private connectionAttempts: number = 0;
   private messageCallback: ((data: ServerMessageRequest) => void) | null = null;
 
-  constructor(port: number, secret: string) {
+  constructor(host: string, port: number, secret: string) {
+    this.host = host;
     this.port = port;
     this.secret = secret;
   }
 
   public connect(): void {
-    console.log("Connecting to WebSocket server at port", this.port);
+    console.log(`Connecting to WebSocket server at ${this.host}:${this.port}`);
 
-    this.socket = new WebSocket(`ws://localhost:${this.port}`);
+    this.socket = new WebSocket(`ws://${this.host}:${this.port}`);
 
     this.socket.addEventListener("open", () => {
-      console.log("Connected to WebSocket server at port", this.port);
+      console.log(`Connected to WebSocket server at ${this.host}:${this.port}`);
       this.connectionAttempts = 0;
     });
 
     this.socket.addEventListener("close", () => {
-      console.log("WebSocket connection closed event at port", this.port);
+      console.log(`WebSocket connection closed event at ${this.host}:${this.port}`);
       this.connectionAttempts = 0;
     });
 
