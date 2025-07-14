@@ -15,17 +15,7 @@ export class MessageHandler {
       throw new Error(`Command '${req.cmd}' is disabled in extension settings`);
     }
 
-    // Add audit log entry
-    const toolId = COMMAND_TO_TOOL_ID[req.cmd];
-    const auditEntry = {
-      toolId,
-      command: req.cmd,
-      timestamp: Date.now(),
-      url: (req as any).url || undefined // Extract URL if it exists in the request
-    };
-    
-    // Log asynchronously to avoid blocking the command execution
-    addAuditLogEntry(auditEntry).catch(error => {
+    this.addAuditLogForReq(req).catch((error) => {
       console.error("Failed to add audit log entry:", error);
     });
 
@@ -68,6 +58,32 @@ export class MessageHandler {
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
     }
+  }
+
+  private async addAuditLogForReq(req: ServerMessageRequest) {
+    // Get the URL in context (either from param or from the tab)
+    let contextUrl: string | undefined;
+    if ("url" in req && req.url) {
+      contextUrl = req.url;
+    }
+    if ("tabId" in req) {
+      try {
+        const tab = await browser.tabs.get(req.tabId);
+        contextUrl = tab.url;
+      } catch (error) {
+        console.error("Failed to get tab URL for audit log:", error);
+      }
+    }
+
+    const toolId = COMMAND_TO_TOOL_ID[req.cmd];
+    const auditEntry = {
+      toolId,
+      command: req.cmd,
+      timestamp: Date.now(),
+      url: contextUrl
+    };
+    
+    await addAuditLogEntry(auditEntry);
   }
 
   private async openUrl(correlationId: string, url: string): Promise<void> {

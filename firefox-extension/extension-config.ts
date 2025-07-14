@@ -5,6 +5,7 @@
 import { ServerMessageRequest } from "@browser-control-mcp/common/server-messages";
 
 const DEFAULT_WS_PORT = 8089;
+const AUDIT_LOG_SIZE_LIMIT = 100; // Maximum number of audit log entries to keep
 
 // Define all available tools with their IDs and descriptions
 export interface ToolInfo {
@@ -279,9 +280,9 @@ export async function addAuditLogEntry(entry: AuditLogEntry): Promise<void> {
   // Add the new entry at the beginning
   config.auditLog.unshift(entry);
   
-  // Keep only the last 100 entries to prevent storage bloat
-  if (config.auditLog.length > 100) {
-    config.auditLog = config.auditLog.slice(0, 100);
+  // Keep only the last AUDIT_LOG_SIZE_LIMIT entries
+  if (config.auditLog.length > AUDIT_LOG_SIZE_LIMIT) {
+    config.auditLog = config.auditLog.slice(0, AUDIT_LOG_SIZE_LIMIT);
   }
   
   await saveConfig(config);
