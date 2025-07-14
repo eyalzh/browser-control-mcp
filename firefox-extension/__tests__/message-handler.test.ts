@@ -44,6 +44,7 @@ describe("MessageHandler", () => {
       },
       domainDenyList: [],
       ports: [8089],
+      auditLog: [],
     };
 
     (browser.storage.local.get as jest.Mock).mockResolvedValue({
@@ -67,6 +68,7 @@ describe("MessageHandler", () => {
         },
         domainDenyList: [],
         ports: [8089],
+        auditLog: [],
       };
       (browser.storage.local.get as jest.Mock).mockResolvedValue({
         config: configWithDisabledOpenTab,
@@ -140,6 +142,7 @@ describe("MessageHandler", () => {
           },
           domainDenyList: ["example.com", "another.com"],
           ports: [8089],
+          auditLog: [],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,
@@ -173,6 +176,7 @@ describe("MessageHandler", () => {
           },
           domainDenyList: ["example.com", "another.com"],
           ports: [8089],
+          auditLog: [],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,
@@ -394,6 +398,7 @@ describe("MessageHandler", () => {
           },
           domainDenyList: ["example.com"], // Add example.com to deny list
           ports: [8089],
+          auditLog: [],
         };
         (browser.storage.local.get as jest.Mock).mockResolvedValue({
           config: configWithDenyList,

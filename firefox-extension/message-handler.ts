@@ -1,6 +1,6 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
-import { isCommandAllowed, isDomainInDenyList } from "./extension-config";
+import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -14,6 +14,20 @@ export class MessageHandler {
     if (!isAllowed) {
       throw new Error(`Command '${req.cmd}' is disabled in extension settings`);
     }
+
+    // Add audit log entry
+    const toolId = COMMAND_TO_TOOL_ID[req.cmd];
+    const auditEntry = {
+      toolId,
+      command: req.cmd,
+      timestamp: Date.now(),
+      url: (req as any).url || undefined // Extract URL if it exists in the request
+    };
+    
+    // Log asynchronously to avoid blocking the command execution
+    addAuditLogEntry(auditEntry).catch(error => {
+      console.error("Failed to add audit log entry:", error);
+    });
 
     switch (req.cmd) {
       case "open-tab":

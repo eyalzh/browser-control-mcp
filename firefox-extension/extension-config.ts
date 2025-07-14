@@ -68,12 +68,21 @@ export interface ToolSettings {
   [toolId: string]: boolean;
 }
 
+// Audit log entry interface
+export interface AuditLogEntry {
+  toolId: string;
+  command: string;
+  timestamp: number;
+  url?: string;
+}
+
 // Extended config interface
 export interface ExtensionConfig {
   secret: string;
   toolSettings?: ToolSettings;
   domainDenyList?: string[];
   ports: number[];
+  auditLog?: AuditLogEntry[];
 }
 
 /**
@@ -253,4 +262,56 @@ export async function setPorts(ports: number[]): Promise<void> {
   const config = await getConfig();
   config.ports = ports;
   await saveConfig(config);
+}
+
+/**
+ * Adds an entry to the audit log
+ * @param entry The audit log entry to add
+ * @returns A Promise that resolves when the entry is saved
+ */
+export async function addAuditLogEntry(entry: AuditLogEntry): Promise<void> {
+  const config = await getConfig();
+  
+  if (!config.auditLog) {
+    config.auditLog = [];
+  }
+  
+  // Add the new entry at the beginning
+  config.auditLog.unshift(entry);
+  
+  // Keep only the last 100 entries to prevent storage bloat
+  if (config.auditLog.length > 100) {
+    config.auditLog = config.auditLog.slice(0, 100);
+  }
+  
+  await saveConfig(config);
+}
+
+/**
+ * Gets the audit log entries
+ * @returns A Promise that resolves with the audit log entries
+ */
+export async function getAuditLog(): Promise<AuditLogEntry[]> {
+  const config = await getConfig();
+  return config.auditLog || [];
+}
+
+/**
+ * Clears the audit log
+ * @returns A Promise that resolves when the audit log is cleared
+ */
+export async function clearAuditLog(): Promise<void> {
+  const config = await getConfig();
+  config.auditLog = [];
+  await saveConfig(config);
+}
+
+/**
+ * Gets the tool name by tool ID
+ * @param toolId The tool ID to look up
+ * @returns The tool name or the tool ID if not found
+ */
+export function getToolNameById(toolId: string): string {
+  const tool = AVAILABLE_TOOLS.find(t => t.id === toolId);
+  return tool ? tool.name : toolId;
 }

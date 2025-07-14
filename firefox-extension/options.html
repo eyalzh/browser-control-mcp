@@ -274,6 +274,52 @@
       filter: blur(2px);
       pointer-events: none;
     }
+
+    /* Audit log styles */
+    .audit-log-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .audit-log-table th,
+    .audit-log-table td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    .audit-log-table th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .audit-log-table td {
+      color: #666;
+    }
+
+    .audit-log-url {
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .audit-log-timestamp {
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .audit-log-empty {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 20px;
+    }
   </style>
 </head>
 
@@ -373,6 +419,22 @@
 
         <button id="save-domain-lists" class="copy-button" style="margin-top: 15px;">Save Domain Lists</button>
         <div class="status" id="domain-status"></div>
+      </div>
+    </div>
+
+    <div class="section-container">
+      <h2 class="collapsed" role="button" aria-expanded="false" tabindex="0" id="audit-log-header">Audit Log</h2>
+      <div class="section-content collapsed" aria-labelledby="audit-log-header">
+        <p>View recent tool usage history:</p>
+        
+        <div id="audit-log-container" style="margin-top: 20px;">
+          <div class="loading">Loading audit log...</div>
+        </div>
+
+        <div style="margin-top: 15px;">
+          <button id="clear-audit-log" class="copy-button">Clear Log</button>
+          <div class="status" id="audit-log-status"></div>
+        </div>
       </div>
     </div>
   </div>

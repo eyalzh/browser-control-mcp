@@ -10,6 +10,9 @@ import {
   setDomainDenyList,
   getPorts,
   setPorts,
+  getAuditLog,
+  clearAuditLog,
+  getToolNameById,
 } from "./extension-config";
 
 const secretDisplay = document.getElementById(
@@ -32,6 +35,9 @@ const domainStatusElement = document.getElementById(
 const portsInput = document.getElementById("ports-input") as HTMLInputElement;
 const savePortsButton = document.getElementById("save-ports") as HTMLButtonElement;
 const portsStatusElement = document.getElementById("ports-status") as HTMLDivElement;
+const auditLogContainer = document.getElementById("audit-log-container") as HTMLDivElement;
+const clearAuditLogButton = document.getElementById("clear-audit-log") as HTMLButtonElement;
+const auditLogStatusElement = document.getElementById("audit-log-status") as HTMLDivElement;
 
 /**
  * Loads the secret from storage and displays it
@@ -298,6 +304,122 @@ async function savePorts(event: MouseEvent) {
 }
 
 /**
+ * Loads the audit log from storage and displays it
+ */
+async function loadAuditLog() {
+  try {
+    const auditLog = await getAuditLog();
+    
+    // Clear existing content
+    auditLogContainer.innerHTML = "";
+    
+    if (auditLog.length === 0) {
+      // Show empty state
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "audit-log-empty";
+      emptyDiv.textContent = "No tool usage recorded yet.";
+      auditLogContainer.appendChild(emptyDiv);
+      return;
+    }
+    
+    // Create table
+    const table = document.createElement("table");
+    table.className = "audit-log-table";
+    
+    // Create header
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    
+    const headers = ["Tool", "Timestamp", "Domain"];
+    headers.forEach(headerText => {
+      const th = document.createElement("th");
+      th.textContent = headerText;
+      headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Create body
+    const tbody = document.createElement("tbody");
+    
+    auditLog.forEach(entry => {
+      const row = document.createElement("tr");
+      
+      // Tool name
+      const toolCell = document.createElement("td");
+      toolCell.textContent = getToolNameById(entry.toolId);
+      row.appendChild(toolCell);
+      
+      // Timestamp
+      const timestampCell = document.createElement("td");
+      timestampCell.className = "audit-log-timestamp";
+      const date = new Date(entry.timestamp);
+      timestampCell.textContent = date.toLocaleString();
+      row.appendChild(timestampCell);
+      
+      // URL Domain
+      const urlCell = document.createElement("td");
+      urlCell.className = "audit-log-url";
+      if (entry.url) {
+        // Show only the domain part of the URL
+        try {
+          const urlObj = new URL(entry.url);
+          urlCell.textContent = urlObj.hostname;
+        } catch (e) {
+          console.error("Invalid URL in audit log entry:", e);
+          urlCell.textContent = "Invalid URL";
+        }
+      } else {
+        urlCell.textContent = "-";
+      }
+      row.appendChild(urlCell);
+      
+      tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    auditLogContainer.appendChild(table);
+    
+  } catch (error) {
+    console.error("Error loading audit log:", error);
+    auditLogContainer.innerHTML = '<div class="audit-log-empty">Error loading audit log. Please check console for details.</div>';
+  }
+}
+
+/**
+ * Clears the audit log
+ */
+async function handleClearAuditLog(event: MouseEvent) {
+  if (!event.isTrusted) {
+    return;
+  }
+
+  try {
+    await clearAuditLog();
+    
+    // Reload the audit log display
+    await loadAuditLog();
+    
+    // Show success message
+    auditLogStatusElement.textContent = "Audit log cleared successfully!";
+    auditLogStatusElement.style.color = "#4caf50";
+    setTimeout(() => {
+      auditLogStatusElement.textContent = "";
+      auditLogStatusElement.style.color = "";
+    }, 3000);
+  } catch (error) {
+    console.error("Error clearing audit log:", error);
+    auditLogStatusElement.textContent = "Failed to clear audit log";
+    auditLogStatusElement.style.color = "red";
+    setTimeout(() => {
+      auditLogStatusElement.textContent = "";
+      auditLogStatusElement.style.color = "";
+    }, 3000);
+  }
+}
+
+/**
  * Initializes the collapsible sections
  */
 function initializeCollapsibleSections() {
@@ -456,11 +578,13 @@ function hidePermissionModal() {
 copyButton.addEventListener("click", copyToClipboard);
 saveDomainListsButton.addEventListener("click", saveDomainLists);
 savePortsButton.addEventListener("click", savePorts);
+clearAuditLogButton.addEventListener("click", handleClearAuditLog);
 document.addEventListener("DOMContentLoaded", () => {
   loadSecret();
   createToolSettingsUI();
   loadDomainLists();
   loadPorts();
+  loadAuditLog();
   initializeCollapsibleSections();
 
   // Ensure modal is hidden by default
@@ -485,4 +609,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error parsing requestPermissions:", error);
     }
   }
+
+  // Add interval to refresh the audit log every 5 seconds:
+  setInterval(() => {
+    loadAuditLog();
+  }, 5000);
 });
