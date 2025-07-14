@@ -12,12 +12,12 @@ dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.4.0",
+  version: "1.5.0",
 });
 
 mcpServer.tool(
   "open-browser-tab",
-  "Open a new tab in the user's browser",
+  "Open a new tab in the user's browser (useful when the user asks to open a website)",
   { url: z.string() },
   async ({ url }) => {
     const openedTabId = await browserApi.openTab(url);
