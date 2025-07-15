@@ -1,7 +1,4 @@
-import {
-  McpServer,
-  ResourceTemplate,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
@@ -12,7 +9,7 @@ dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.5.0",
+  version: "1.5.1",
 });
 
 mcpServer.tool(
@@ -183,11 +180,28 @@ mcpServer.tool(
   {
     tabIds: z.array(z.number()),
     isCollapsed: z.boolean().default(false),
-    groupColor: z.enum(["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"]).default("grey"),
+    groupColor: z
+      .enum([
+        "grey",
+        "blue",
+        "red",
+        "yellow",
+        "green",
+        "pink",
+        "purple",
+        "cyan",
+        "orange",
+      ])
+      .default("grey"),
     groupTitle: z.string().default("New Group"),
   },
   async ({ tabIds, isCollapsed, groupColor, groupTitle }) => {
-    const groupId = await browserApi.groupTabs(tabIds, isCollapsed, groupColor, groupTitle);
+    const groupId = await browserApi.groupTabs(
+      tabIds,
+      isCollapsed,
+      groupColor,
+      groupTitle
+    );
     return {
       content: [
         {
@@ -199,56 +213,17 @@ mcpServer.tool(
   }
 );
 
-mcpServer.resource(
-  "open-tab-contents",
-  new ResourceTemplate("browser://tab/{tabId}/content", {
-    list: async () => {
-      const openTabs = await browserApi.getTabList();
-      return {
-        resources: (openTabs ?? []).map((tab) => ({
-          uri: `browser://tab/${tab.id}/content`,
-          name: tab.title || tab.url || "",
-          mimeType: "text/plain",
-        })),
-      };
-    },
-  }),
-  async (uri, { tabId }) => {
-    const content = await browserApi.getTabContent(Number(tabId), 0);
-    const listOfLinks =
-      content?.links
-        .map(
-          (link: { text: string; url: string }) => `${link.text}: ${link.url}`
-        )
-        .join("\n") ?? "";
-    const fullText = content?.fullText ?? "";
-    return {
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: "text/plain",
-          text: `Webpage text: \n\n${fullText} \n\nWeb page Links:\n${listOfLinks}`,
-        },
-      ],
-    };
-  }
-);
-
 const browserApi = new BrowserAPI();
-browserApi
-  .init()
-  .catch((err) => {
-    console.error("Browser API init error", err);
-    process.exit(1);
-  });
+browserApi.init().catch((err) => {
+  console.error("Browser API init error", err);
+  process.exit(1);
+});
 
 const transport = new StdioServerTransport();
-mcpServer
-  .connect(transport)
-  .catch((err) => {
-    console.error("MCP Server connection error", err);
-    process.exit(1);
-  });
+mcpServer.connect(transport).catch((err) => {
+  console.error("MCP Server connection error", err);
+  process.exit(1);
+});
 
 process.stdin.on("close", () => {
   browserApi.close();
