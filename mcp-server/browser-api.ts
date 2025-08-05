@@ -175,6 +175,15 @@ export class BrowserAPI {
     return message.groupId;
   }
 
+  async getBookmarks(query?: string): Promise<string> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "get-bookmarks",
+      query,
+    });
+    const message = await this.waitForResponse(correlationId, "bookmarks");
+    return message.bookmarksText;
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");

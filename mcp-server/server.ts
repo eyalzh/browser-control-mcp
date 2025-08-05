@@ -9,7 +9,7 @@ dayjs.extend(relativeTime);
 
 const mcpServer = new McpServer({
   name: "BrowserControl",
-  version: "1.5.1",
+  version: "1.6.0",
 });
 
 mcpServer.tool(
@@ -207,6 +207,23 @@ mcpServer.tool(
         {
           type: "text",
           text: `Created tab group "${groupTitle}" with ${tabIds.length} tabs (group ID: ${groupId})`,
+        },
+      ],
+    };
+  }
+);
+
+mcpServer.tool(
+  "get-browser-bookmarks",
+  "Get the user's browser bookmarks as a hierarchical text structure. Use query parameter to search for specific bookmarks.",
+  { query: z.string().optional() },
+  async ({ query }) => {
+    const bookmarksText = await browserApi.getBookmarks(query);
+    return {
+      content: [
+        {
+          type: "text",
+          text: bookmarksText,
         },
       ],
     };

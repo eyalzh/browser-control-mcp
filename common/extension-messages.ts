@@ -60,6 +60,11 @@ export interface TabGroupCreatedExtensionMessage extends ExtensionMessageBase {
   groupId: number;
 }
 
+export interface BookmarksExtensionMessage extends ExtensionMessageBase {
+  resource: "bookmarks";
+  bookmarksText: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -68,7 +73,8 @@ export type ExtensionMessage =
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage
   | TabsClosedExtensionMessage
-  | TabGroupCreatedExtensionMessage;
+  | TabGroupCreatedExtensionMessage
+  | BookmarksExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

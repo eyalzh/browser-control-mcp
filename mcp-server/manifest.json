@@ -1,7 +1,7 @@
 {
     "dxt_version": "0.1",
     "name": "browser-control-firefox",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "display_name": "Firefox Control",
     "description": "Control Mozilla Firefox: tabs, history and web content (privacy aware)",
     "long_description": "This MCP server provides AI assistants with access to the browser's tab management, browsing history, page search, and webpage text content through a local MCP (Model Context Protocol) connection.\n\nBefore accessing any webpage content, explicit user consent is required for each domain through browser-side permissions.\n\n**Note:** This extension requires a separate Firefox add-on component, which is available at [https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/). Start by installing the Firefox add-on, then copy the secret key from the add-on settings page (it will open automatically) and paste it into this extension's configuration.",
@@ -82,6 +82,10 @@
         {
             "name": "find-highlight-in-browser-tab",
             "description": "Find and highlight text in a browser tab"
+        },
+        {
+            "name": "get-browser-bookmarks",
+            "description": "Get the user's browser bookmarks as a hierarchical text structure"
         }
     ]
 }
