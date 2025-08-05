@@ -54,3 +54,6 @@ dist
 web-ext-artifacts/
 
 .DS_Store
+
+# Coding agent related files
+task.md

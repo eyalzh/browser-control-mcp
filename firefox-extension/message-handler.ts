@@ -1,6 +1,7 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
+import { formatBookmarksAsText } from "./util";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -53,6 +54,9 @@ export class MessageHandler {
           req.groupColor as browser.tabGroups.Color,
           req.groupTitle
         );
+        break;
+      case "get-bookmarks":
+        await this.sendBookmarks(req.correlationId, req.query);
         break;
       default:
         const _exhaustiveCheck: never = req;
@@ -325,4 +329,30 @@ export class MessageHandler {
       groupId: tabGroup.id,
     });
   }
+
+  private async sendBookmarks(
+    correlationId: string,
+    query?: string
+  ): Promise<void> {
+    // Get the bookmarks tree
+    let bookmarks: browser.bookmarks.BookmarkTreeNode[];
+    
+    if (query) {
+      // If query is provided, search bookmarks
+      bookmarks = await browser.bookmarks.search(query);
+    } else {
+      // Get all bookmarks from the root
+      bookmarks = await browser.bookmarks.getTree();
+    }
+
+    // Convert bookmarks tree to hierarchical text
+    const bookmarksText = formatBookmarksAsText(bookmarks, query ? false : true);
+
+    await this.client.sendResourceToServer({
+      resource: "bookmarks",
+      correlationId,
+      bookmarksText,
+    });
+  }
+
 }
