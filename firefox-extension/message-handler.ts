@@ -54,6 +54,9 @@ export class MessageHandler {
           req.groupTitle
         );
         break;
+      case "capture-screenshot":
+        await this.captureScreenshot(req.correlationId, req.tabId);
+        break;
       default:
         const _exhaustiveCheck: never = req;
         console.error("Invalid message received:", req);
@@ -324,5 +327,44 @@ export class MessageHandler {
       correlationId,
       groupId: tabGroup.id,
     });
+  }
+
+  private async captureScreenshot(
+    correlationId: string,
+    tabId?: number
+  ): Promise<void> {
+    try {
+      let targetTabId = tabId;
+      
+      // If no tab ID provided, get the active tab
+      if (!targetTabId) {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs.length > 0) {
+          targetTabId = tabs[0].id;
+        }
+      }
+
+      if (!targetTabId) {
+        throw new Error("No active tab found");
+      }
+
+      // Capture visible area of the tab
+      const dataUrl = await browser.tabs.captureVisibleTab(undefined, {
+        format: "png"
+      });
+
+      await this.client.sendResourceToServer({
+        resource: "captureScreenshot",
+        correlationId,
+        dataUrl,
+      });
+    } catch (error: any) {
+      console.error("Failed to capture screenshot:", error);
+      await this.client.sendResourceToServer({
+        resource: "error",
+        correlationId,
+        errorMessage: error.message || "Failed to capture screenshot",
+      } as any);
+    }
   }
 }

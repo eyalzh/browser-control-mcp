@@ -7,7 +7,8 @@
         "tabs",
         "tabGroups",
         "history",
-        "storage"
+        "storage",
+        "<all_urls>"
     ],
     "optional_permissions": [
         "*://*/*",
