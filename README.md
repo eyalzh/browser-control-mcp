@@ -39,15 +39,13 @@ The purpose of this MCP server is to provide AI agents with safe access to the u
 
 Clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
-npm install
-npm install --prefix mcp-server
-npm install --prefix firefox-extension
-npm run build
+pnpm install
+pnpm install --prefix mcp-server
+pnpm install --prefix firefox-extension
+pnpm run build
 ```
 
-### Usage with Firefox
-
-The browser-control-mcp extension was developed for Firefox.
+### Installing the Firefox extension
 
 To install the extension:
 
@@ -66,19 +64,20 @@ After installing the extension, add the following configuration to `claude_deskt
 ```
 {
     "mcpServers": {
-        "browser-control": {
-            "command": "node",
+        "firefox-mcp": {
+            "command": "npx",
             "args": [
-                "/path/to/repo/mcp-server/dist/server.js"
+                "-y",
+                "@delorenj/browser-control-firefox",
             ],
             "env": {
-                "EXTENSION_SECRET": "<secret_from_extension>"
+                "EXTENSION_SECRET": "<secret_from_extension>",
+                "EXTENSION_PORT": "8089"
             }
         }
     }
 }
 ```
-Replace `/path/to/repo` with the correct path.
 
 Set the EXTENSION_SECRET based on the value provided on the extension's preferences in the extension management page in Firefox (you can access it from `about:addons`). You can also set the EXTENSION_PORT environment variable to specify the port that the MCP server will use to communicate with the extension (default is 8089).
 
