@@ -4,6 +4,9 @@ import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import * as fs from "fs/promises";
+import * as path from "path";
+import * as os from "os";
 
 dayjs.extend(relativeTime);
 
@@ -210,6 +213,57 @@ mcpServer.tool(
         },
       ],
     };
+  }
+);
+
+mcpServer.tool(
+  "capture-browser-screenshot",
+  "Capture a screenshot of a browser tab",
+  { 
+    tabId: z.number().optional().describe("Tab ID to capture. If not provided, captures the active tab")
+  },
+  async ({ tabId }) => {
+    try {
+      const screenshotDataUrl = await browserApi.captureTabScreenshot(tabId);
+      
+      // Create screenshots directory in temp
+      const screenshotsDir = path.join(os.tmpdir(), 'browser-control-mcp-screenshots');
+      await fs.mkdir(screenshotsDir, { recursive: true });
+      
+      // Save screenshot to temp file
+      const timestamp = Date.now();
+      const screenshotPath = path.join(screenshotsDir, `screenshot-${timestamp}.png`);
+      
+      // Convert data URL to buffer and save
+      const base64Data = screenshotDataUrl.replace(/^data:image\/png;base64,/, "");
+      const buffer = Buffer.from(base64Data, 'base64');
+      await fs.writeFile(screenshotPath, buffer);
+      
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Screenshot captured and saved to: ${screenshotPath}`,
+          },
+          {
+            type: "resource",
+            resource: {
+              uri: `file://${screenshotPath}`,
+              mimeType: "image/png",
+              text: `Browser screenshot captured at ${new Date(timestamp).toISOString()}`
+            }
+          }
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Failed to capture screenshot: ${error.message}`, 
+          isError: true 
+        }],
+      };
+    }
   }
 );
 
