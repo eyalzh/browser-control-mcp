@@ -47,6 +47,8 @@ The MCP server and Firefox extension combo is designed to be more secure than we
 
 ## Installation
 
+Update: Due to [an issue with MCP startup](https://github.com/modelcontextprotocol/servers/issues/812), the MCP server does not currently work with **Claude Desktop**. 
+
 ### Option 1: Install the Firefox and Claude Desktop extensions
 
 The Firefox extension / add-on is [available on addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/). You can also download and open the latest pre-built version from this GitHub repository: [browser-control-mcp-1.5.0.xpi](https://github.com/eyalzh/browser-control-mcp/releases/download/v1.5.0/browser-control-1.5.0.xpi). Complete the installation based on the instructions in the "Manage extension" page, which will open automatically after installation.
