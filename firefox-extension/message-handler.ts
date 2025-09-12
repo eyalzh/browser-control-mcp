@@ -334,13 +334,24 @@ export class MessageHandler {
     tabId?: number
   ): Promise<void> {
     try {
+      console.log("[Screenshot] Starting capture process...");
+      
+      // Check if the API is available
+      if (!browser.tabs.captureVisibleTab) {
+        console.error("[Screenshot] browser.tabs.captureVisibleTab is not available!");
+        throw new Error("captureVisibleTab API is not available in this browser");
+      }
+      
       let targetTabId = tabId;
       
       // If no tab ID provided, get the active tab
       if (!targetTabId) {
+        console.log("[Screenshot] No tab ID provided, getting active tab...");
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        console.log("[Screenshot] Query result:", tabs.length, "tabs found");
         if (tabs.length > 0) {
           targetTabId = tabs[0].id;
+          console.log("[Screenshot] Using active tab ID:", targetTabId);
         }
       }
 
@@ -348,18 +359,44 @@ export class MessageHandler {
         throw new Error("No active tab found");
       }
 
+      // Get tab info for debugging
+      const tab = await browser.tabs.get(targetTabId);
+      console.log("[Screenshot] Tab info:", {
+        id: tab.id,
+        url: tab.url,
+        title: tab.title,
+        status: tab.status
+      });
+
+      // Check permissions
+      const permissions = await browser.permissions.getAll();
+      console.log("[Screenshot] Current permissions:", permissions);
+
+      console.log("[Screenshot] Calling captureVisibleTab...");
+      
       // Capture visible area of the tab
       const dataUrl = await browser.tabs.captureVisibleTab(undefined, {
         format: "png"
       });
+
+      console.log("[Screenshot] Capture successful, dataUrl length:", dataUrl ? dataUrl.length : "null");
+      console.log("[Screenshot] DataUrl preview:", dataUrl ? dataUrl.substring(0, 50) + "..." : "null");
 
       await this.client.sendResourceToServer({
         resource: "captureScreenshot",
         correlationId,
         dataUrl,
       });
+      
+      console.log("[Screenshot] Successfully sent to server");
     } catch (error: any) {
-      console.error("Failed to capture screenshot:", error);
+      console.error("[Screenshot] Full error details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        toString: error.toString()
+      });
+      
       await this.client.sendResourceToServer({
         resource: "error",
         correlationId,

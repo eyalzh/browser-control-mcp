@@ -5,10 +5,11 @@
     "description": "An extension that allows a local MCP server to perform actions on the browser.",
     "permissions": [
         "tabs",
-        "tabGroups",
+        "tabGroups", 
         "history",
         "storage",
-        "<all_urls>"
+        "<all_urls>",
+        "activeTab"
     ],
     "optional_permissions": [
         "*://*/*",
