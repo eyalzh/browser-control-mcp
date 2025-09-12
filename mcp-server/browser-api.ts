@@ -240,6 +240,15 @@ export class BrowserAPI {
       }
     );
   }
+
+  async captureTabScreenshot(tabId?: number): Promise<string> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "capture-screenshot",
+      tabId,
+    });
+    const response = await this.waitForResponse(correlationId, "captureScreenshot");
+    return response.dataUrl;
+  }
 }
 
 function readConfig() {
