@@ -49,21 +49,41 @@ mcpServer.tool(
 
 mcpServer.tool(
   "get-list-of-open-tabs",
-  "Get the list of open tabs in the user's browser",
-  {},
-  async () => {
+  "Get the list of open tabs in the user's browser. Use offset and limit parameters for pagination when there are many tabs.",
+  {
+    offset: z.number().default(0).describe("Starting index for pagination (0-based)"),
+    limit: z.number().default(100).describe("Maximum number of tabs to return (default: 100, max: 500)"),
+  },
+  async ({ offset, limit }) => {
+    // Validate and cap the limit
+    const effectiveLimit = Math.min(Math.max(1, limit), 500);
+
     const openTabs = await browserApi.getTabList();
+    const totalTabs = openTabs.length;
+
+    // Apply pagination
+    const paginatedTabs = openTabs.slice(offset, offset + effectiveLimit);
+    const hasMore = offset + effectiveLimit < totalTabs;
+
+    // Add pagination info as the first content item
+    const paginationInfo = {
+      type: "text" as const,
+      text: `Showing tabs ${offset + 1}-${offset + paginatedTabs.length} of ${totalTabs} total tabs${hasMore ? ` (use offset=${offset + effectiveLimit} to see more)` : ''}`,
+    };
+
+    const tabContent = paginatedTabs.map((tab) => {
+      let lastAccessed = "unknown";
+      if (tab.lastAccessed) {
+        lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
+      }
+      return {
+        type: "text" as const,
+        text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
+      };
+    });
+
     return {
-      content: openTabs.map((tab) => {
-        let lastAccessed = "unknown";
-        if (tab.lastAccessed) {
-          lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
-        }
-        return {
-          type: "text",
-          text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
-        };
-      }),
+      content: [paginationInfo, ...tabContent],
     };
   }
 );
