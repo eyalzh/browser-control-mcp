@@ -16,6 +16,11 @@ export interface GetTabListServerMessage extends ServerMessageBase {
   cmd: "get-tab-list";
 }
 
+export interface GetTabMetadataServerMessage extends ServerMessageBase {
+  cmd: "get-tab-metadata";
+  tabId: number;
+}
+
 export interface GetBrowserRecentHistoryServerMessage extends ServerMessageBase {
   cmd: "get-browser-recent-history";
   searchQuery?: string;
@@ -50,6 +55,7 @@ export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
   | GetTabListServerMessage
+  | GetTabMetadataServerMessage
   | GetBrowserRecentHistoryServerMessage
   | GetTabContentServerMessage
   | ReorderTabsServerMessage

@@ -37,6 +37,7 @@ describe("MessageHandler", () => {
         "open-browser-tab": true,
         "close-browser-tabs": true,
         "get-list-of-open-tabs": true,
+        "get-tab-metadata": true,
         "get-recent-browser-history": true,
         "get-tab-web-content": true,
         "reorder-browser-tabs": true,
@@ -61,6 +62,7 @@ describe("MessageHandler", () => {
           "open-browser-tab": false, // Disable open-tab command
           "close-browser-tabs": true,
           "get-list-of-open-tabs": true,
+          "get-tab-metadata": true,
           "get-recent-browser-history": true,
           "get-tab-web-content": true,
           "reorder-browser-tabs": true,
@@ -135,6 +137,7 @@ describe("MessageHandler", () => {
             "open-browser-tab": true,
             "close-browser-tabs": true,
             "get-list-of-open-tabs": true,
+            "get-tab-metadata": true,
             "get-recent-browser-history": true,
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
@@ -169,6 +172,7 @@ describe("MessageHandler", () => {
             "open-browser-tab": true,
             "close-browser-tabs": true,
             "get-list-of-open-tabs": true,
+            "get-tab-metadata": true,
             "get-recent-browser-history": true,
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
@@ -250,6 +254,82 @@ describe("MessageHandler", () => {
           correlationId: "test-correlation-id",
           tabs: mockTabs,
         });
+      });
+    });
+
+    describe("get-tab-metadata command", () => {
+      it("should get tab metadata and send it to the server", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "get-tab-metadata",
+          tabId: 123,
+          correlationId: "test-correlation-id",
+        };
+
+        const mockTabMetadata = {
+          id: 123,
+          url: "https://example.com",
+          title: "Example Page",
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTabMetadata);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        expect(browser.tabs.get).toHaveBeenCalledWith(123);
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "tab-metadata",
+          correlationId: "test-correlation-id",
+          metadata: mockTabMetadata,
+        });
+      });
+
+      it("should throw an error if command is disabled", async () => {
+        const configWithDisabledMetadata: ExtensionConfig = {
+          secret: "test-secret",
+          toolSettings: {
+            "open-browser-tab": true,
+            "close-browser-tabs": true,
+            "get-list-of-open-tabs": true,
+            "get-tab-metadata": false,
+            "get-recent-browser-history": true,
+            "get-tab-web-content": true,
+            "reorder-browser-tabs": true,
+            "find-highlight-in-browser-tab": true,
+          },
+          domainDenyList: [],
+          ports: [8089],
+          auditLog: [],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDisabledMetadata,
+        });
+
+        const request: ServerMessageRequest = {
+          cmd: "get-tab-metadata",
+          tabId: 123,
+          correlationId: "test-correlation-id",
+        };
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Command 'get-tab-metadata' is disabled in extension settings");
+        expect(browser.tabs.get).not.toHaveBeenCalled();
+      });
+
+      it("should throw an error if tab does not exist", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "get-tab-metadata",
+          tabId: 999,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockRejectedValue(
+          new Error("No tab with id: 999")
+        );
+
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("No tab with id: 999");
+        expect(mockClient.sendResourceToServer).not.toHaveBeenCalled();
       });
     });
 
@@ -391,6 +471,7 @@ describe("MessageHandler", () => {
             "open-browser-tab": true,
             "close-browser-tabs": true,
             "get-list-of-open-tabs": true,
+            "get-tab-metadata": true,
             "get-recent-browser-history": true,
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
