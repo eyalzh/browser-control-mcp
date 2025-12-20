@@ -7,6 +7,6 @@
     "build": "nx run-many --target=build --all --parallel"
   },
   "devDependencies": {
-    "nx": "20.6.0"
+    "nx": "22.3.3"
   }
 }
