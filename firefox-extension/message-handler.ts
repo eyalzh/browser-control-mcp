@@ -29,6 +29,9 @@ export class MessageHandler {
       case "get-tab-list":
         await this.sendTabs(req.correlationId);
         break;
+      case "get-tab-metadata":
+        await this.sendTabMetadata(req.correlationId, req.tabId);
+        break;
       case "get-browser-recent-history":
         await this.sendRecentHistory(req.correlationId, req.searchQuery);
         break;
@@ -124,6 +127,15 @@ export class MessageHandler {
       resource: "tabs",
       correlationId,
       tabs,
+    });
+  }
+
+  private async sendTabMetadata(correlationId: string, tabId: number): Promise<void> {
+    const tabs = await browser.tabs.get(tabId);
+    await this.client.sendResourceToServer({
+      resource: "tab-metadata",
+      correlationId,
+      metadata: tabs as unknown as Record<string, unknown>,
     });
   }
 

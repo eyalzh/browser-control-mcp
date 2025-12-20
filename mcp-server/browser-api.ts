@@ -113,6 +113,15 @@ export class BrowserAPI {
     return message.tabs;
   }
 
+  async getTabMetadata(tabId: number): Promise<Record<string, unknown>> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "get-tab-metadata",
+      tabId,
+    });
+    const message = await this.waitForResponse(correlationId, "tab-metadata");
+    return message.metadata;
+  }
+
   async getBrowserRecentHistory(
     searchQuery?: string
   ): Promise<BrowserHistoryItem[]> {
