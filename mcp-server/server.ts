@@ -51,7 +51,7 @@ mcpServer.tool(
   "get-list-of-open-tabs",
   "Get the list of open tabs in the user's browser. Use offset and limit parameters for pagination when there are many tabs.",
   {
-    offset: z.number().default(0).describe("Starting index for pagination (0-based)"),
+    offset: z.number().int().min(0).default(0).describe("Starting index for pagination (0-based, must be >= 0)"),
     limit: z.number().default(100).describe("Maximum number of tabs to return (default: 100, max: 500)"),
   },
   async ({ offset, limit }) => {
