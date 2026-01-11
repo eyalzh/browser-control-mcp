@@ -31,6 +31,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     description: "Allows the MCP server to get a list of all open tabs"
   },
   {
+    id: "get-tab-metadata",
+    name: "Get Tab Metadata",
+    description: "Allows the MCP server to get comprehensive metadata about a specific tab (pinned, hidden, active status, etc.)"
+  },
+  {
     id: "get-recent-browser-history",
     name: "Get Recent Browser History",
     description: "Allows the MCP server to access your recent browsing history"
@@ -57,6 +62,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "open-tab": "open-browser-tab",
   "close-tabs": "close-browser-tabs",
   "get-tab-list": "get-list-of-open-tabs",
+  "get-tab-metadata": "get-tab-metadata",
   "get-browser-recent-history": "get-recent-browser-history",
   "get-tab-content": "get-tab-web-content",
   "reorder-tabs": "reorder-browser-tabs",
