@@ -175,6 +175,14 @@ export class BrowserAPI {
     return message.groupId;
   }
 
+  async getCurrentTab(): Promise<BrowserTab> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "get-current-tab",
+    });
+    const message = await this.waitForResponse(correlationId, "current-tab");
+    return message.tab;
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");

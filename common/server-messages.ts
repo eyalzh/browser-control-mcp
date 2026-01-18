@@ -46,6 +46,10 @@ export interface GroupTabsServerMessage extends ServerMessageBase {
   groupTitle: string;
 }
 
+export interface GetCurrentTabServerMessage extends ServerMessageBase {
+  cmd: "get-current-tab";
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -54,6 +58,7 @@ export type ServerMessage =
   | GetTabContentServerMessage
   | ReorderTabsServerMessage
   | FindHighlightServerMessage
-  | GroupTabsServerMessage;
+  | GroupTabsServerMessage
+  | GetCurrentTabServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };
