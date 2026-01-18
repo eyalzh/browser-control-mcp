@@ -60,6 +60,11 @@ export interface TabGroupCreatedExtensionMessage extends ExtensionMessageBase {
   groupId: number;
 }
 
+export interface CurrentTabExtensionMessage extends ExtensionMessageBase {
+  resource: "current-tab";
+  tab: BrowserTab;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -68,7 +73,8 @@ export type ExtensionMessage =
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage
   | TabsClosedExtensionMessage
-  | TabGroupCreatedExtensionMessage;
+  | TabGroupCreatedExtensionMessage
+  | CurrentTabExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

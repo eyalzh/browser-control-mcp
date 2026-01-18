@@ -89,6 +89,23 @@ mcpServer.tool(
 );
 
 mcpServer.tool(
+  "get-current-tab",
+  "Get information about the currently active tab in the browser",
+  {},
+  async () => {
+    const currentTab = await browserApi.getCurrentTab();
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Current tab: id=${currentTab.id}, url=${currentTab.url}, title=${currentTab.title}`,
+        },
+      ],
+    };
+  }
+);
+
+mcpServer.tool(
   "get-recent-browser-history",
   "Get the list of recent browser history (to get all, don't use searchQuery)",
   { searchQuery: z.string().optional() },
