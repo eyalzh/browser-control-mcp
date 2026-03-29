@@ -4,6 +4,10 @@
 
 An MCP server paired with a Firefox browser extension that provides AI assistants with access to tab management, browsing history, and webpage text content.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/eyalzh-browser-control-mcp).
+
 ## Features
 
 The MCP server supports the following tools:
