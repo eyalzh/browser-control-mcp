@@ -12,8 +12,14 @@ const mockBrowser = {
     update: jest.fn(),
     group: jest.fn(),
   },
+  windows: {
+    update: jest.fn(),
+  },
   tabGroups: {
     update: jest.fn(),
+  },
+  contextualIdentities: {
+    query: jest.fn(),
   },
   history: {
     search: jest.fn(),
@@ -24,8 +30,8 @@ const mockBrowser = {
   },
   storage: {
     local: {
-        get: jest.fn(),
-        set: jest.fn(),
+      get: jest.fn(),
+      set: jest.fn(),
     },
   },
   permissions: {
@@ -37,7 +43,7 @@ const mockBrowser = {
 };
 
 // Override the global browser object
-Object.defineProperty(global, 'browser', {
+Object.defineProperty(global, "browser", {
   value: mockBrowser,
   writable: true,
   configurable: true,

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { BrowserAPI } from "./browser-api";
+import type { BrowserContainer, BrowserTab } from "@browser-control-mcp/common";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -12,26 +13,101 @@ const mcpServer = new McpServer({
   version: "1.5.1",
 });
 
+const browserApi = new BrowserAPI();
+
+function describeContainer(tab: BrowserTab): string {
+  if (tab.container) {
+    return `${tab.container.name} (${tab.container.cookieStoreId})`;
+  }
+  return "default";
+}
+
+function describeLastAccessed(lastAccessed?: number): string {
+  if (!lastAccessed) {
+    return "unknown";
+  }
+  return dayjs(lastAccessed).fromNow();
+}
+
+function filterTabsByContainer(
+  tabs: BrowserTab[],
+  requestedContainer?: string
+): BrowserTab[] {
+  const candidate = requestedContainer?.trim();
+  if (!candidate) {
+    return tabs;
+  }
+
+  if (candidate === "default") {
+    return tabs.filter(
+      (tab) => tab.container === null || tab.container === undefined
+    );
+  }
+
+  return tabs.filter((tab) => {
+    if (!tab.container) {
+      return false;
+    }
+    return (
+      tab.container.cookieStoreId === candidate ||
+      tab.container.name === candidate ||
+      tab.container.name.toLowerCase() === candidate.toLowerCase()
+    );
+  });
+}
+
+function renderTabLine(tab: BrowserTab): string {
+  return [
+    `tab id=${tab.id}`,
+    `window id=${tab.windowId}`,
+    `index=${tab.index}`,
+    `tab url=${tab.url}`,
+    `tab title=${tab.title}`,
+    `container=${describeContainer(tab)}`,
+    `active=${tab.active ? "yes" : "no"}`,
+    `pinned=${tab.pinned ? "yes" : "no"}`,
+    `last accessed=${describeLastAccessed(tab.lastAccessed)}`,
+  ].join(", ");
+}
+
+function renderContainerLine(container: BrowserContainer): string {
+  return [
+    `container name=${container.name}`,
+    `cookieStoreId=${container.cookieStoreId}`,
+    `color=${container.color}`,
+    `icon=${container.icon}`,
+  ].join(", ");
+}
+
 mcpServer.tool(
   "open-browser-tab",
-  "Open a new tab in the user's browser (useful when the user asks to open a website)",
-  { url: z.string() },
-  async ({ url }) => {
-    const openedTabId = await browserApi.openTab(url);
-    if (openedTabId !== undefined) {
+  "Open a new tab in the user's browser. Optionally choose a Firefox container by exact name or cookieStoreId.",
+  {
+    url: z.string(),
+    container: z.string().optional(),
+  },
+  async ({ url, container }) => {
+    const openedTab = await browserApi.openTab(url, container);
+    if (openedTab.tabId !== undefined) {
+      const details = openedTab.tab
+        ? ` in ${describeContainer(openedTab.tab)}`
+        : "";
       return {
         content: [
           {
             type: "text",
-            text: `${url} opened in tab id ${openedTabId}`,
+            text: `${url} opened in tab id ${openedTab.tabId}${details}`,
           },
         ],
-      };
-    } else {
-      return {
-        content: [{ type: "text", text: "Failed to open tab", isError: true }],
+        structuredContent: {
+          tabId: openedTab.tabId,
+          tab: openedTab.tab ?? null,
+        },
       };
     }
+    return {
+      content: [{ type: "text", text: "Failed to open tab", isError: true }],
+    };
   }
 );
 
@@ -51,39 +127,110 @@ mcpServer.tool(
   "get-list-of-open-tabs",
   "Get the list of open tabs in the user's browser. Use offset and limit parameters for pagination when there are many tabs.",
   {
-    offset: z.number().int().min(0).default(0).describe("Starting index for pagination (0-based, must be >= 0)"),
-    limit: z.number().default(100).describe("Maximum number of tabs to return (default: 100, max: 500)"),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Starting index for pagination (0-based, must be >= 0)"),
+    limit: z
+      .number()
+      .default(100)
+      .describe("Maximum number of tabs to return (default: 100, max: 500)"),
+    container: z
+      .string()
+      .optional()
+      .describe("Optional Firefox container name or cookieStoreId filter"),
+    windowId: z
+      .number()
+      .int()
+      .optional()
+      .describe("Optional browser window ID filter"),
+    activeOnly: z
+      .boolean()
+      .default(false)
+      .describe("If true, return only active tabs"),
   },
-  async ({ offset, limit }) => {
-    // Validate and cap the limit
+  async ({ offset, limit, container, windowId, activeOnly }) => {
     const effectiveLimit = Math.min(Math.max(1, limit), 500);
 
-    const openTabs = await browserApi.getTabList();
-    const totalTabs = openTabs.length;
+    let openTabs = await browserApi.getTabList();
+    openTabs = filterTabsByContainer(openTabs, container);
 
-    // Apply pagination
+    if (windowId !== undefined) {
+      openTabs = openTabs.filter((tab) => tab.windowId === windowId);
+    }
+    if (activeOnly) {
+      openTabs = openTabs.filter((tab) => tab.active);
+    }
+
+    const totalTabs = openTabs.length;
     const paginatedTabs = openTabs.slice(offset, offset + effectiveLimit);
     const hasMore = offset + effectiveLimit < totalTabs;
 
-    // Add pagination info as the first content item
     const paginationInfo = {
       type: "text" as const,
-      text: `Showing tabs ${offset + 1}-${offset + paginatedTabs.length} of ${totalTabs} total tabs${hasMore ? ` (use offset=${offset + effectiveLimit} to see more)` : ''}`,
+      text:
+        `Showing tabs ${offset + 1}-${offset + paginatedTabs.length} ` +
+        `of ${totalTabs} total tabs` +
+        (hasMore ? ` (use offset=${offset + effectiveLimit} to see more)` : ""),
     };
 
-    const tabContent = paginatedTabs.map((tab) => {
-      let lastAccessed = "unknown";
-      if (tab.lastAccessed) {
-        lastAccessed = dayjs(tab.lastAccessed).fromNow(); // LLM-friendly time ago
-      }
-      return {
-        type: "text" as const,
-        text: `tab id=${tab.id}, tab url=${tab.url}, tab title=${tab.title}, last accessed=${lastAccessed}`,
-      };
-    });
-
     return {
-      content: [paginationInfo, ...tabContent],
+      content: [
+        paginationInfo,
+        ...paginatedTabs.map((tab) => ({
+          type: "text" as const,
+          text: renderTabLine(tab),
+        })),
+      ],
+      structuredContent: {
+        tabs: paginatedTabs,
+        total: totalTabs,
+        offset,
+        limit: effectiveLimit,
+        hasMore,
+      },
+    };
+  }
+);
+
+mcpServer.tool(
+  "activate-browser-tab",
+  "Activate an open browser tab and focus its window",
+  { tabId: z.number() },
+  async ({ tabId }) => {
+    const activatedTab = await browserApi.activateTab(tabId);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Activated tab id ${activatedTab.tabId} in window ${activatedTab.windowId}`,
+        },
+      ],
+      structuredContent: {
+        tabId: activatedTab.tabId,
+        windowId: activatedTab.windowId,
+        tab: activatedTab.tab ?? null,
+      },
+    };
+  }
+);
+
+mcpServer.tool(
+  "list-browser-containers",
+  "List Firefox containers with both human names and cookieStoreId values",
+  {},
+  async () => {
+    const containers = await browserApi.getContainerList();
+    return {
+      content: containers.map((container) => ({
+        type: "text" as const,
+        text: renderContainerLine(container),
+      })),
+      structuredContent: {
+        containers,
+      },
     };
   }
 );
@@ -101,27 +248,24 @@ mcpServer.tool(
         content: browserHistory.map((item) => {
           let lastVisited = "unknown";
           if (item.lastVisitTime) {
-            lastVisited = dayjs(item.lastVisitTime).fromNow(); // LLM-friendly time ago
+            lastVisited = dayjs(item.lastVisitTime).fromNow();
           }
           return {
-            type: "text",
+            type: "text" as const,
             text: `url=${item.url}, title="${item.title}", lastVisitTime=${lastVisited}`,
           };
         }),
       };
-    } else {
-      // If nothing was found for the search query, hint the AI to list
-      // all the recent history items instead.
-      const hint = searchQuery ? "Try without a searchQuery" : "";
-      return { content: [{ type: "text", text: `No history found. ${hint}` }] };
     }
+    const hint = searchQuery ? "Try without a searchQuery" : "";
+    return { content: [{ type: "text", text: `No history found. ${hint}` }] };
   }
 );
 
 mcpServer.tool(
   "get-tab-web-content",
   `
-    Get the full text content of the webpage and the list of links in the webpage, by tab ID. 
+    Get the full text content of the webpage and the list of links in the webpage, by tab ID.
     Use "offset" only for larger documents when the first call was truncated and if you require more content in order to assist the user.
   `,
   { tabId: z.number(), offset: z.number().default(0) },
@@ -129,12 +273,9 @@ mcpServer.tool(
     const content = await browserApi.getTabContent(tabId, offset);
     let links: { type: "text"; text: string }[] = [];
     if (offset === 0) {
-      // Only include the links if offset is 0 (default value). Otherwise, we can
-      // assume this is not the first call. Adding the links again would be redundant.
       links = content.links.map((link: { text: string; url: string }) => {
         return {
           type: "text",
-
           text: `Link text: ${link.text}, Link URL: ${link.url}`,
         };
       });
@@ -143,9 +284,6 @@ mcpServer.tool(
     let text = content.fullText;
     let hint: { type: "text"; text: string }[] = [];
     if (content.isTruncated || offset > 0) {
-      // If the content is truncated, add a "tip" suggesting
-      // that another tool, search in page, can be used to
-      // discover additional data.
       const rangeString = `${offset}-${offset + text.length}`;
       hint = [
         {
@@ -233,7 +371,6 @@ mcpServer.tool(
   }
 );
 
-const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);
   process.exit(1);

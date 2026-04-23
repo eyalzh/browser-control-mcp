@@ -3,6 +3,14 @@ export interface ExtensionMessageBase {
   correlationId: string;
 }
 
+export interface BrowserContainer {
+  cookieStoreId: string;
+  name: string;
+  color: string;
+  colorCode?: string;
+  icon: string;
+}
+
 export interface TabContentExtensionMessage extends ExtensionMessageBase {
   resource: "tab-content";
   tabId: number;
@@ -14,9 +22,15 @@ export interface TabContentExtensionMessage extends ExtensionMessageBase {
 
 export interface BrowserTab {
   id?: number;
+  windowId?: number;
+  index?: number;
   url?: string;
   title?: string;
   lastAccessed?: number;
+  active?: boolean;
+  pinned?: boolean;
+  cookieStoreId?: string;
+  container?: BrowserContainer | null;
 }
 
 export interface TabsExtensionMessage extends ExtensionMessageBase {
@@ -27,6 +41,19 @@ export interface TabsExtensionMessage extends ExtensionMessageBase {
 export interface OpenedTabIdExtensionMessage extends ExtensionMessageBase {
   resource: "opened-tab-id";
   tabId: number | undefined;
+  tab?: BrowserTab;
+}
+
+export interface ActivatedTabExtensionMessage extends ExtensionMessageBase {
+  resource: "activated-tab";
+  tabId: number | undefined;
+  windowId: number | undefined;
+  tab?: BrowserTab;
+}
+
+export interface ContainersExtensionMessage extends ExtensionMessageBase {
+  resource: "containers";
+  containers: BrowserContainer[];
 }
 
 export interface BrowserHistoryItem {
@@ -64,6 +91,8 @@ export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
   | OpenedTabIdExtensionMessage
+  | ActivatedTabExtensionMessage
+  | ContainersExtensionMessage
   | BrowserHistoryExtensionMessage
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage

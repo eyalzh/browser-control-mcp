@@ -7,7 +7,9 @@
         "tabs",
         "tabGroups",
         "history",
-        "storage"
+        "storage",
+        "contextualIdentities",
+        "cookies"
     ],
     "optional_permissions": [
         "*://*/*",

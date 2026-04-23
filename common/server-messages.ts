@@ -5,6 +5,7 @@ export interface ServerMessageBase {
 export interface OpenTabServerMessage extends ServerMessageBase {
   cmd: "open-tab";
   url: string;
+  container?: string;
 }
 
 export interface CloseTabsServerMessage extends ServerMessageBase {
@@ -14,6 +15,14 @@ export interface CloseTabsServerMessage extends ServerMessageBase {
 
 export interface GetTabListServerMessage extends ServerMessageBase {
   cmd: "get-tab-list";
+  container?: string;
+  windowId?: number;
+  activeOnly?: boolean;
+}
+
+export interface ActivateTabServerMessage extends ServerMessageBase {
+  cmd: "activate-tab";
+  tabId: number;
 }
 
 export interface GetBrowserRecentHistoryServerMessage extends ServerMessageBase {
@@ -46,14 +55,20 @@ export interface GroupTabsServerMessage extends ServerMessageBase {
   groupTitle: string;
 }
 
+export interface GetContainerListServerMessage extends ServerMessageBase {
+  cmd: "get-container-list";
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
   | GetTabListServerMessage
+  | ActivateTabServerMessage
   | GetBrowserRecentHistoryServerMessage
   | GetTabContentServerMessage
   | ReorderTabsServerMessage
   | FindHighlightServerMessage
-  | GroupTabsServerMessage;
+  | GroupTabsServerMessage
+  | GetContainerListServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };

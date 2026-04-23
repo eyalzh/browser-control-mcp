@@ -1,6 +1,17 @@
-import type { ServerMessageRequest } from "@browser-control-mcp/common";
+import type {
+  BrowserContainer,
+  BrowserTab,
+  ServerMessageRequest,
+} from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
-import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
+import {
+  isCommandAllowed,
+  isDomainInDenyList,
+  COMMAND_TO_TOOL_ID,
+  addAuditLogEntry,
+} from "./extension-config";
+
+const DEFAULT_CONTAINER_NAME = "default";
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -21,13 +32,19 @@ export class MessageHandler {
 
     switch (req.cmd) {
       case "open-tab":
-        await this.openUrl(req.correlationId, req.url);
+        await this.openUrl(req.correlationId, req.url, req.container);
         break;
       case "close-tabs":
         await this.closeTabs(req.correlationId, req.tabIds);
         break;
       case "get-tab-list":
         await this.sendTabs(req.correlationId);
+        break;
+      case "activate-tab":
+        await this.activateTab(req.correlationId, req.tabId);
+        break;
+      case "get-container-list":
+        await this.sendContainers(req.correlationId);
         break;
       case "get-browser-recent-history":
         await this.sendRecentHistory(req.correlationId, req.searchQuery);
@@ -61,7 +78,6 @@ export class MessageHandler {
   }
 
   private async addAuditLogForReq(req: ServerMessageRequest) {
-    // Get the URL in context (either from param or from the tab)
     let contextUrl: string | undefined;
     if ("url" in req && req.url) {
       contextUrl = req.url;
@@ -80,13 +96,17 @@ export class MessageHandler {
       toolId,
       command: req.cmd,
       timestamp: Date.now(),
-      url: contextUrl
+      url: contextUrl,
     };
-    
+
     await addAuditLogEntry(auditEntry);
   }
 
-  private async openUrl(correlationId: string, url: string): Promise<void> {
+  private async openUrl(
+    correlationId: string,
+    url: string,
+    container?: string
+  ): Promise<void> {
     if (!url.startsWith("https://")) {
       console.error("Invalid URL:", url);
       throw new Error("Invalid URL");
@@ -96,14 +116,19 @@ export class MessageHandler {
       throw new Error("Domain in user defined deny list");
     }
 
+    const cookieStoreId = await this.resolveRequestedContainer(container);
     const tab = await browser.tabs.create({
       url,
+      ...(cookieStoreId ? { cookieStoreId } : {}),
     });
+    const containerMap = await this.getContainerMap();
+    const tabDetails = this.mapBrowserTab(tab, containerMap);
 
     await this.client.sendResourceToServer({
       resource: "opened-tab-id",
       correlationId,
       tabId: tab.id,
+      tab: tabDetails,
     });
   }
 
@@ -120,10 +145,40 @@ export class MessageHandler {
 
   private async sendTabs(correlationId: string): Promise<void> {
     const tabs = await browser.tabs.query({});
+    const containerMap = await this.getContainerMap();
+    const mappedTabs = tabs.map((tab) => this.mapBrowserTab(tab, containerMap));
     await this.client.sendResourceToServer({
       resource: "tabs",
       correlationId,
-      tabs,
+      tabs: mappedTabs,
+    });
+  }
+
+  private async activateTab(
+    correlationId: string,
+    tabId: number
+  ): Promise<void> {
+    const activatedTab = await browser.tabs.update(tabId, { active: true });
+    if (activatedTab.windowId !== undefined) {
+      await browser.windows.update(activatedTab.windowId, { focused: true });
+    }
+    const containerMap = await this.getContainerMap();
+    const tabDetails = this.mapBrowserTab(activatedTab, containerMap);
+    await this.client.sendResourceToServer({
+      resource: "activated-tab",
+      correlationId,
+      tabId: activatedTab.id,
+      windowId: activatedTab.windowId,
+      tab: tabDetails,
+    });
+  }
+
+  private async sendContainers(correlationId: string): Promise<void> {
+    const containers = await this.getContainers();
+    await this.client.sendResourceToServer({
+      resource: "containers",
+      correlationId,
+      containers,
     });
   }
 
@@ -132,9 +187,9 @@ export class MessageHandler {
     searchQuery: string | null = null
   ): Promise<void> {
     const historyItems = await browser.history.search({
-      text: searchQuery ?? "", // Search for all URLs (empty string matches everything)
-      maxResults: 200, // Limit to 200 results
-      startTime: 0, // Search from the beginning of time
+      text: searchQuery ?? "",
+      maxResults: 200,
+      startTime: 0,
     });
     const filteredHistoryItems = historyItems.filter((item) => {
       return !!item.url;
@@ -146,9 +201,6 @@ export class MessageHandler {
     });
   }
 
-  // Check that the user has granted permission to access the URL's domain.
-  // This will open the options page with a URL parameter to request permission
-  // and throw an error to indicate that the request cannot proceed until permission is granted.
   private async checkForUrlPermission(url: string | undefined): Promise<void> {
     if (url) {
       const origin = new URL(url).origin;
@@ -157,7 +209,6 @@ export class MessageHandler {
       });
 
       if (!granted) {
-        // Open the options page with a URL parameter to request permission:
         const optionsUrl = browser.runtime.getURL("options.html");
         const urlWithParams = `${optionsUrl}?requestUrl=${encodeURIComponent(
           url
@@ -177,7 +228,6 @@ export class MessageHandler {
     });
 
     if (!granted) {
-      // Open the options page with a URL parameter to request permission:
       const optionsUrl = browser.runtime.getURL("options.html");
       const urlWithParams = `${optionsUrl}?requestPermissions=${encodeURIComponent(
         JSON.stringify(permissions)
@@ -255,7 +305,6 @@ export class MessageHandler {
     correlationId: string,
     tabOrder: number[]
   ): Promise<void> {
-    // Reorder the tabs sequentially
     for (let newIndex = 0; newIndex < tabOrder.length; newIndex++) {
       const tabId = tabOrder[newIndex];
       await browser.tabs.move(tabId, { index: newIndex });
@@ -285,10 +334,7 @@ export class MessageHandler {
       caseSensitive: true,
     });
 
-    // If there are results, highlight them
     if (findResults.count > 0) {
-      // But first, activate the tab. In firefox, this would also enable
-      // auto-scrolling to the highlighted result.
       await browser.tabs.update(tabId, { active: true });
       browser.find.highlightResults({
         tabId,
@@ -313,7 +359,7 @@ export class MessageHandler {
       tabIds,
     });
 
-    let tabGroup = await browser.tabGroups.update(groupId, {
+    const tabGroup = await browser.tabGroups.update(groupId, {
       collapsed: isCollapsed,
       color: groupColor,
       title: groupTitle,
@@ -324,5 +370,105 @@ export class MessageHandler {
       correlationId,
       groupId: tabGroup.id,
     });
+  }
+
+  private async getContainers(): Promise<BrowserContainer[]> {
+    const identities = await browser.contextualIdentities.query({});
+    return identities
+      .map((identity) => ({
+        cookieStoreId: identity.cookieStoreId,
+        name: identity.name,
+        color: identity.color,
+        colorCode: identity.colorCode,
+        icon: identity.icon,
+      }))
+      .sort((a, b) => {
+        const byName = a.name.localeCompare(b.name);
+        if (byName !== 0) {
+          return byName;
+        }
+        return a.cookieStoreId.localeCompare(b.cookieStoreId);
+      });
+  }
+
+  private mapBrowserTab(
+    tab: browser.tabs.Tab,
+    containerMap: Map<string, BrowserContainer>
+  ): BrowserTab {
+    return {
+      id: tab.id,
+      windowId: tab.windowId,
+      index: tab.index,
+      url: tab.url,
+      title: tab.title,
+      lastAccessed: tab.lastAccessed,
+      active: tab.active,
+      pinned: tab.pinned,
+      cookieStoreId: tab.cookieStoreId,
+      container:
+        tab.cookieStoreId && !this.isDefaultCookieStore(tab.cookieStoreId)
+          ? (containerMap.get(tab.cookieStoreId) ?? null)
+          : null,
+    };
+  }
+
+  private async getContainerMap(): Promise<Map<string, BrowserContainer>> {
+    const containers = await this.getContainers();
+    return new Map(
+      containers.map((container) => [container.cookieStoreId, container])
+    );
+  }
+
+  private isDefaultCookieStore(cookieStoreId: string): boolean {
+    return cookieStoreId === "firefox-default";
+  }
+
+  private async resolveRequestedContainer(
+    requestedContainer?: string
+  ): Promise<string | undefined> {
+    const candidate = requestedContainer?.trim();
+    if (!candidate || candidate === DEFAULT_CONTAINER_NAME) {
+      return undefined;
+    }
+
+    const containers = await this.getContainers();
+
+    const exactIdMatch = containers.find(
+      (container) => container.cookieStoreId === candidate
+    );
+    if (exactIdMatch) {
+      return exactIdMatch.cookieStoreId;
+    }
+
+    const exactNameMatches = containers.filter(
+      (container) => container.name === candidate
+    );
+    if (exactNameMatches.length === 1) {
+      return exactNameMatches[0].cookieStoreId;
+    }
+    if (exactNameMatches.length > 1) {
+      throw new Error(
+        `Container name "${candidate}" is ambiguous. Use cookieStoreId instead.`
+      );
+    }
+
+    const caseInsensitiveMatches = containers.filter(
+      (container) => container.name.toLowerCase() === candidate.toLowerCase()
+    );
+    if (caseInsensitiveMatches.length === 1) {
+      return caseInsensitiveMatches[0].cookieStoreId;
+    }
+    if (caseInsensitiveMatches.length > 1) {
+      throw new Error(
+        `Container name "${candidate}" is ambiguous. Use cookieStoreId instead.`
+      );
+    }
+
+    const validContainers = containers
+      .map((container) => `${container.name} (${container.cookieStoreId})`)
+      .join(", ");
+    throw new Error(
+      `Unknown container "${candidate}". Valid containers: ${validContainers}`
+    );
   }
 }

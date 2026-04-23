@@ -3,8 +3,8 @@
     "name": "browser-control-firefox",
     "version": "1.5.1",
     "display_name": "Firefox Control",
-    "description": "Control Mozilla Firefox: tabs, history and web content (privacy aware)",
-    "long_description": "This MCP server provides AI assistants with access to the browser's tab management, browsing history, page search, and webpage text content through a local MCP (Model Context Protocol) connection.\n\nBefore accessing any webpage content, explicit user consent is required for each domain through browser-side permissions.\n\n**Note:** This extension requires a separate Firefox add-on component, which is available at [https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/). Start by installing the Firefox add-on, then copy the secret key from the add-on settings page (it will open automatically) and paste it into this extension's configuration.",
+    "description": "Control Mozilla Firefox: tabs, containers, history and web content (privacy aware)",
+    "long_description": "This MCP server provides AI assistants with access to the browser's tab management, Firefox container metadata, browsing history, page search, and webpage text content through a local MCP (Model Context Protocol) connection.\n\nBefore accessing any webpage content, explicit user consent is required for each domain through browser-side permissions.\n\n**Note:** This extension requires a separate Firefox add-on component, which is available at [https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/). Start by installing the Firefox add-on, then copy the secret key from the add-on settings page (it will open automatically) and paste it into this extension's configuration.",
     "author": {
         "name": "eyalzh",
         "url": "https://github.com/eyalzh"
@@ -61,7 +61,15 @@
         },
         {
             "name": "get-list-of-open-tabs",
-            "description": "Get the list of open tabs in the browser"
+            "description": "Get the list of open tabs in the browser, including Firefox container metadata"
+        },
+        {
+            "name": "activate-browser-tab",
+            "description": "Activate an open browser tab and focus its window"
+        },
+        {
+            "name": "list-browser-containers",
+            "description": "List Firefox containers and their cookieStoreId values"
         },
         {
             "name": "get-recent-browser-history",

@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import type {
   ExtensionMessage,
+  BrowserContainer,
   BrowserTab,
   BrowserHistoryItem,
   ServerMessage,
@@ -88,13 +89,20 @@ export class BrowserAPI {
     return this.wsServer?.options.port;
   }
 
-  async openTab(url: string): Promise<number | undefined> {
+  async openTab(
+    url: string,
+    container?: string
+  ): Promise<{ tabId: number | undefined; tab?: BrowserTab }> {
     const correlationId = this.sendMessageToExtension({
       cmd: "open-tab",
       url,
+      container,
     });
     const message = await this.waitForResponse(correlationId, "opened-tab-id");
-    return message.tabId;
+    return {
+      tabId: message.tabId,
+      tab: message.tab,
+    };
   }
 
   async closeTabs(tabIds: number[]) {
@@ -111,6 +119,33 @@ export class BrowserAPI {
     });
     const message = await this.waitForResponse(correlationId, "tabs");
     return message.tabs;
+  }
+
+  async activateTab(
+    tabId: number
+  ): Promise<{
+    tabId: number | undefined;
+    windowId: number | undefined;
+    tab?: BrowserTab;
+  }> {
+    const correlationId = await this.sendMessageToExtension({
+      cmd: "activate-tab",
+      tabId,
+    });
+    const message = await this.waitForResponse(correlationId, "activated-tab");
+    return {
+      tabId: message.tabId,
+      windowId: message.windowId,
+      tab: message.tab,
+    };
+  }
+
+  async getContainerList(): Promise<BrowserContainer[]> {
+    const correlationId = await this.sendMessageToExtension({
+      cmd: "get-container-list",
+    });
+    const message = await this.waitForResponse(correlationId, "containers");
+    return message.containers;
   }
 
   async getBrowserRecentHistory(
