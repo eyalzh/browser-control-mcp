@@ -13,20 +13,29 @@ import * as crypto from "crypto";
 
 const WS_DEFAULT_PORT = 8089;
 const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
+const EXTENSION_CONNECTION_TIMEOUT_MS = 10_000;
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
   resolve: (value: Extract<ExtensionMessage, { resource: T }>) => void;
-  reject: (reason?: string) => void;
+  reject: (reason?: unknown) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
+
+interface ExtensionConnectionWaiter {
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 export class BrowserAPI {
   private ws: WebSocket | null = null;
   private wsServer: WebSocket.Server | null = null;
   private sharedSecret: string | null = null;
+  private connectionWaiters: ExtensionConnectionWaiter[] = [];
 
-  // Map to persist the request to the extension. It maps the request correlationId
-  // to a resolver, fulfulling a promise created when sending a message to the extension.
+  // Tracks extension requests by correlationId so responses can resolve the
+  // matching command promise.
   private extensionRequestMap: Map<
     string,
     ExtensionRequestResolver<ExtensionMessage["resource"]>
@@ -60,8 +69,9 @@ export class BrowserAPI {
       this.ws = connection;
 
       console.error("WebSocket connection established on port", port);
+      this.resolveConnectionWaiters();
 
-      this.ws.on("message", (message) => {
+      connection.on("message", (message) => {
         const decoded = JSON.parse(message.toString());
         if (isErrorMessage(decoded)) {
           this.handleExtensionError(decoded);
@@ -74,6 +84,16 @@ export class BrowserAPI {
         }
         this.handleDecodedExtensionMessage(decoded.payload);
       });
+
+      connection.on("close", () => {
+        const wasCurrentConnection = this.ws === connection;
+        if (wasCurrentConnection) {
+          this.ws = null;
+          this.rejectPendingExtensionRequests(
+            "Firefox extension disconnected before responding"
+          );
+        }
+      });
     });
     this.wsServer.on("error", (error) => {
       console.error("WebSocket server error:", error);
@@ -81,6 +101,9 @@ export class BrowserAPI {
   }
 
   close() {
+    this.rejectConnectionWaiters(
+      "MCP server closed before the extension connected"
+    );
     this.wsServer?.close();
   }
 
@@ -89,7 +112,7 @@ export class BrowserAPI {
   }
 
   async openTab(url: string): Promise<number | undefined> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "open-tab",
       url,
     });
@@ -98,7 +121,7 @@ export class BrowserAPI {
   }
 
   async closeTabs(tabIds: number[]) {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "close-tabs",
       tabIds,
     });
@@ -106,7 +129,7 @@ export class BrowserAPI {
   }
 
   async getTabList(): Promise<BrowserTab[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-tab-list",
     });
     const message = await this.waitForResponse(correlationId, "tabs");
@@ -116,7 +139,7 @@ export class BrowserAPI {
   async getBrowserRecentHistory(
     searchQuery?: string
   ): Promise<BrowserHistoryItem[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-browser-recent-history",
       searchQuery,
     });
@@ -128,7 +151,7 @@ export class BrowserAPI {
     tabId: number,
     offset: number
   ): Promise<TabContentExtensionMessage> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "get-tab-content",
       tabId,
       offset,
@@ -137,7 +160,7 @@ export class BrowserAPI {
   }
 
   async reorderTabs(tabOrder: number[]): Promise<number[]> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "reorder-tabs",
       tabOrder,
     });
@@ -146,7 +169,7 @@ export class BrowserAPI {
   }
 
   async findHighlight(tabId: number, queryPhrase: string): Promise<number> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "find-highlight",
       tabId,
       queryPhrase,
@@ -164,7 +187,7 @@ export class BrowserAPI {
     groupColor: string,
     groupTitle: string
   ): Promise<number> {
-    const correlationId = this.sendMessageToExtension({
+    const correlationId = await this.sendMessageToExtension({
       cmd: "group-tabs",
       tabIds,
       isCollapsed,
@@ -184,7 +207,8 @@ export class BrowserAPI {
     return hmac.digest("hex");
   }
 
-  private sendMessageToExtension(message: ServerMessage): string {
+  private async sendMessageToExtension(message: ServerMessage): Promise<string> {
+    await this.waitForExtensionConnection();
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket is not open");
     }
@@ -206,20 +230,30 @@ export class BrowserAPI {
 
   private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
     const { correlationId } = decoded;
-    const { resolve, resource } = this.extensionRequestMap.get(correlationId)!;
-    if (resource !== decoded.resource) {
-      console.error("Resource mismatch:", resource, decoded.resource);
+    const resolver = this.extensionRequestMap.get(correlationId);
+    if (!resolver) {
+      console.error("No pending request for correlationId:", correlationId);
+      return;
+    }
+    if (resolver.resource !== decoded.resource) {
+      console.error("Resource mismatch:", resolver.resource, decoded.resource);
       return;
     }
     this.extensionRequestMap.delete(correlationId);
-    resolve(decoded);
+    clearTimeout(resolver.timeout);
+    resolver.resolve(decoded);
   }
 
   private handleExtensionError(decoded: ExtensionError) {
     const { correlationId, errorMessage } = decoded;
-    const { reject } = this.extensionRequestMap.get(correlationId)!;
+    const resolver = this.extensionRequestMap.get(correlationId);
+    if (!resolver) {
+      console.error("No pending request for correlationId:", correlationId);
+      return;
+    }
     this.extensionRequestMap.delete(correlationId);
-    reject(errorMessage);
+    clearTimeout(resolver.timeout);
+    resolver.reject(errorMessage);
   }
 
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
@@ -228,17 +262,68 @@ export class BrowserAPI {
   ): Promise<Extract<ExtensionMessage, { resource: T }>> {
     return new Promise<Extract<ExtensionMessage, { resource: T }>>(
       (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (this.extensionRequestMap.delete(correlationId)) {
+            reject("Timed out waiting for response");
+          }
+        }, EXTENSION_RESPONSE_TIMEOUT_MS);
+
         this.extensionRequestMap.set(correlationId, {
           resolve: resolve as (value: ExtensionMessage) => void,
           resource,
           reject,
+          timeout,
         });
-        setTimeout(() => {
-          this.extensionRequestMap.delete(correlationId);
-          reject("Timed out waiting for response");
-        }, EXTENSION_RESPONSE_TIMEOUT_MS);
       }
     );
+  }
+
+  private async waitForExtensionConnection(): Promise<void> {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.connectionWaiters = this.connectionWaiters.filter(
+          (waiter) => waiter.timeout !== timeout
+        );
+        reject(
+          "Timed out waiting for the Firefox extension websocket connection. Ensure the add-on is enabled and its port/secret match the MCP server."
+        );
+      }, EXTENSION_CONNECTION_TIMEOUT_MS);
+
+      this.connectionWaiters.push({
+        resolve,
+        reject,
+        timeout,
+      });
+    });
+  }
+
+  private resolveConnectionWaiters() {
+    const waiters = this.connectionWaiters.splice(0);
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timeout);
+      waiter.resolve();
+    }
+  }
+
+  private rejectConnectionWaiters(reason: string) {
+    const waiters = this.connectionWaiters.splice(0);
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timeout);
+      waiter.reject(reason);
+    }
+  }
+
+  private rejectPendingExtensionRequests(reason: string) {
+    const pendingRequests = Array.from(this.extensionRequestMap.values());
+    this.extensionRequestMap.clear();
+    for (const request of pendingRequests) {
+      clearTimeout(request.timeout);
+      request.reject(reason);
+    }
   }
 }
 
