@@ -22,7 +22,7 @@ interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
 
 export class BrowserAPI {
   private ws: WebSocket | null = null;
-  private wsServer: WebSocket.Server | null = null;
+  private wsServers: WebSocket.Server[] = [];
   private sharedSecret: string | null = null;
 
   // Map to persist the request to the extension. It maps the request correlationId
@@ -47,45 +47,54 @@ export class BrowserAPI {
       );
     }
 
-    // Unless running in a container, bind to localhost only
-    const host = process.env.CONTAINERIZED ? "0.0.0.0" : "localhost";
+    // Bind explicitly to both loopback addresses so Firefox connects regardless of how
+    // it resolves "localhost". On Linux, getaddrinfo("localhost") often returns ::1
+    // before 127.0.0.1; binding only to "localhost" then yields an IPv6-only listener
+    // and IPv4 connect attempts get refused. Listening on 127.0.0.1 *and* ::1 keeps
+    // the server loopback-only (unlike "::"/"0.0.0.0", which would expose external
+    // interfaces), while accepting both IPv4 and IPv6 clients.
+    const hosts = process.env.CONTAINERIZED ? ["0.0.0.0"] : ["127.0.0.1", "::1"];
 
-    this.wsServer = new WebSocket.Server({
-      host,
-      port,
-    });
+    for (const host of hosts) {
+      const wsServer = new WebSocket.Server({ host, port });
 
-    console.error(`Starting WebSocket server on ${host}:${port}`);
-    this.wsServer.on("connection", async (connection) => {
-      this.ws = connection;
+      console.error(`Starting WebSocket server on ${host}:${port}`);
+      wsServer.on("connection", async (connection) => {
+        this.ws = connection;
 
-      console.error("WebSocket connection established on port", port);
+        console.error("WebSocket connection established on port", port);
 
-      this.ws.on("message", (message) => {
-        const decoded = JSON.parse(message.toString());
-        if (isErrorMessage(decoded)) {
-          this.handleExtensionError(decoded);
-          return;
-        }
-        const signature = this.createSignature(JSON.stringify(decoded.payload));
-        if (signature !== decoded.signature) {
-          console.error("Invalid message signature");
-          return;
-        }
-        this.handleDecodedExtensionMessage(decoded.payload);
+        this.ws.on("message", (message) => {
+          const decoded = JSON.parse(message.toString());
+          if (isErrorMessage(decoded)) {
+            this.handleExtensionError(decoded);
+            return;
+          }
+          const signature = this.createSignature(JSON.stringify(decoded.payload));
+          if (signature !== decoded.signature) {
+            console.error("Invalid message signature");
+            return;
+          }
+          this.handleDecodedExtensionMessage(decoded.payload);
+        });
       });
-    });
-    this.wsServer.on("error", (error) => {
-      console.error("WebSocket server error:", error);
-    });
+      wsServer.on("error", (error) => {
+        console.error(`WebSocket server error on ${host}:${port}:`, error);
+      });
+
+      this.wsServers.push(wsServer);
+    }
   }
 
   close() {
-    this.wsServer?.close();
+    for (const wsServer of this.wsServers) {
+      wsServer.close();
+    }
+    this.wsServers = [];
   }
 
   getSelectedPort() {
-    return this.wsServer?.options.port;
+    return this.wsServers[0]?.options.port;
   }
 
   async openTab(url: string): Promise<number | undefined> {
