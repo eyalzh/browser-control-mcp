@@ -20,12 +20,12 @@ function ps(script) {
   );
 }
 
+function psq(s){ return "'" + String(s).replace(/'/g, "''") + "'"; }
+
 // Shared C# helpers (window enum, focus, cursor, mouse, capture).
 const CS = `
 using System;
 using System.Text;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 public class Win {
@@ -73,7 +73,7 @@ function focusScript(title) {
   return `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; Add-Type @"
 ${CS}
 "@
-$h=[Win]::FindByTitle(${JSON.stringify(title)})
+$h=[Win]::FindByTitle(${psq(title)})
 if($h -eq [IntPtr]::Zero){ Write-Output "NOTFOUND"; exit }
 [Win]::ShowWindow($h,[Win]::SW_RESTORE) | Out-Null
 [Win]::SetForegroundWindow($h) | Out-Null
@@ -111,7 +111,7 @@ mcp.tool("screenshot",
     const out = ps(`Add-Type -AssemblyName System.Windows.Forms,System.Drawing; Add-Type @"
 ${CS}
 "@
-$h=[Win]::FindByTitle(${JSON.stringify(title)})
+$h=[Win]::FindByTitle(${psq(title)})
 if($h -eq [IntPtr]::Zero){ Write-Output "NOTFOUND"; exit }
 [Win]::ShowWindow($h,[Win]::SW_RESTORE) | Out-Null
 [Win]::SetForegroundWindow($h) | Out-Null
@@ -122,7 +122,7 @@ ${crop}
 $bmp=New-Object System.Drawing.Bitmap $cw,$ch
 $g=[System.Drawing.Graphics]::FromImage($bmp)
 $g.CopyFromScreen($r.Left+$cx,$r.Top+$cy,0,0,(New-Object System.Drawing.Size($cw,$ch)))
-$bmp.Save(${JSON.stringify(tmp)},[System.Drawing.Imaging.ImageFormat]::Png)
+$bmp.Save(${psq(tmp)},[System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()
 Write-Output ("OK " + $r.Left + " " + $r.Top + " " + $ww + " " + $wh)`).trim();
     if (out.startsWith("NOTFOUND")) {
@@ -143,12 +143,12 @@ mcp.tool("press_keys",
     const out = ps(`Add-Type -AssemblyName System.Windows.Forms,System.Drawing; Add-Type @"
 ${CS}
 "@
-$h=[Win]::FindByTitle(${JSON.stringify(title)})
+$h=[Win]::FindByTitle(${psq(title)})
 if($h -eq [IntPtr]::Zero){ Write-Output "NOTFOUND"; exit }
 [Win]::ShowWindow($h,[Win]::SW_RESTORE) | Out-Null
 [Win]::SetForegroundWindow($h) | Out-Null
 Start-Sleep -Milliseconds 400
-[System.Windows.Forms.SendKeys]::SendWait(${JSON.stringify(keys)})
+[System.Windows.Forms.SendKeys]::SendWait(${psq(keys)})
 Write-Output "SENT"`).trim();
     return { content: [{ type: "text", text: out }] };
   });
@@ -161,7 +161,7 @@ mcp.tool("click",
     const out = ps(`Add-Type -AssemblyName System.Windows.Forms,System.Drawing; Add-Type @"
 ${CS}
 "@
-$h=[Win]::FindByTitle(${JSON.stringify(title)})
+$h=[Win]::FindByTitle(${psq(title)})
 if($h -eq [IntPtr]::Zero){ Write-Output "NOTFOUND"; exit }
 [Win]::ShowWindow($h,[Win]::SW_RESTORE) | Out-Null
 [Win]::SetForegroundWindow($h) | Out-Null
