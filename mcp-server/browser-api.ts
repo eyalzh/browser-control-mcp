@@ -12,8 +12,25 @@ import { isPortInUse } from "./util";
 import * as crypto from "crypto";
 
 const WS_DEFAULT_PORT = 8089;
-const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
-const EXTENSION_CONNECTION_TIMEOUT_MS = 10_000;
+
+function readPositiveTimeout(name: string, fallback: number): number {
+  const configured = process.env[name];
+  if (!configured) {
+    return fallback;
+  }
+
+  const timeout = Number(configured);
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : fallback;
+}
+
+const EXTENSION_RESPONSE_TIMEOUT_MS = readPositiveTimeout(
+  "BROWSER_CONTROL_MCP_RESPONSE_TIMEOUT_MS",
+  5_000
+);
+const EXTENSION_CONNECTION_TIMEOUT_MS = readPositiveTimeout(
+  "BROWSER_CONTROL_MCP_CONNECTION_TIMEOUT_MS",
+  30_000
+);
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
