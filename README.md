@@ -54,7 +54,28 @@ The Firefox extension / add-on is [available on addons.mozilla.org](https://addo
 The add-on's "Manage extension" page will include a link to the Claude Desktop DXT file. You can also download it here: [mcp-server-v1.5.1.dxt](
 https://github.com/eyalzh/browser-control-mcp/releases/download/v1.5.1/mcp-server-v1.5.1.dxt). After downloading the file, open it or drag it into Claude Desktop's settings window. Make sure to enable the DXT extension after installing it. This will only work with the latest versions of Claude Desktop. If you wish to install the MCP server locally, see the MCP configuration below.
 
-### Option 2: Build from code
+### Option 2: Run with npx
+
+If you have Node.js (v22+) installed, you can run the MCP server directly without cloning or building:
+
+```json
+{
+    "mcpServers": {
+        "browser-control": {
+            "command": "npx",
+            "args": ["browser-control-mcp"],
+            "env": {
+                "EXTENSION_SECRET": "<secret_on_firefox_extension_options_page>",
+                "EXTENSION_PORT": "8089"
+            }
+        }
+    }
+}
+```
+
+The first run will download the package automatically. Subsequent runs use the cached version.
+
+### Option 3: Build from code
 
 To build from code, clone this repository, then run the following commands in the main repository directory to build both the MCP server and the browser extension.
 ```
