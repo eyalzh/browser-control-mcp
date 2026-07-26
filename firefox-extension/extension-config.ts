@@ -49,6 +49,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "find-highlight-in-browser-tab",
     name: "Find and Highlight in Browser Tab",
     description: "Allows the MCP server to search for and highlight text in web pages"
+  },
+  {
+    id: "get-current-tab",
+    name: "Get Current Tab",
+    description: "Allows the MCP server to get information about the currently active tab"
   }
 ];
 
@@ -62,6 +67,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "reorder-tabs": "reorder-browser-tabs",
   "find-highlight": "find-highlight-in-browser-tab",
   "group-tabs": "reorder-browser-tabs",
+  "get-current-tab": "get-current-tab",
 };
 
 // Storage schema for tool settings
