@@ -2,13 +2,15 @@
 
 [![Firefox Add-on](./.github/addon_badge.svg)](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/)
 
-An MCP server paired with a Firefox browser extension that provides AI assistants with access to tab management, browsing history, and webpage text content.
+An MCP server paired with a Firefox browser extension that provides AI assistants with access to tab management, Firefox containers, browsing history, and webpage text content.
 
 ## Features
 
 The MCP server supports the following tools:
 - Open or close tabs
-- Get the list of opened tabs
+- Get the list of opened tabs, including container metadata
+- Activate an existing tab and focus its window
+- List available Firefox containers
 - Create tab groups with name and color
 - Reorder opened tabs
 - Read and search the browser's history
@@ -19,6 +21,7 @@ The MCP server supports the following tools:
 
 ### Tab management
 - *"Close all non-work-related tabs in my browser."*
+- *"List my Firefox containers and open this URL in the Work container."*
 - *"Group all development related tabs in my browser into a new group called 'Development'."*
 - *"Rearrange tabs in my browser in an order that makes sense."*
 - *"Close all tabs in my browser that haven't been accessed within the past 24 hours"*
@@ -42,6 +45,7 @@ The MCP server and Firefox extension combo is designed to be more secure than we
 * No remote data collection or tracking.
 * It provides an extension-side audit log for tool calls and tool enable/disable configuration.
 * The extension includes no runtime third-party dependencies.
+* Firefox container support requires the extension permissions `contextualIdentities` and `cookies`.
 
 **Important note**: Browser Control MCP is still experimental. Use at your own risk. You should practice caution as with any other MCP server and authorize/monitor tool calls carefully.
 
@@ -129,4 +133,3 @@ and use the following mcpServers configuration:
     }
 }
 ```
-
