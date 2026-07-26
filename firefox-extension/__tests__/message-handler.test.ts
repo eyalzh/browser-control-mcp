@@ -41,6 +41,7 @@ describe("MessageHandler", () => {
         "get-tab-web-content": true,
         "reorder-browser-tabs": true,
         "find-highlight-in-browser-tab": true,
+        "get-browser-bookmarks": true,
       },
       domainDenyList: [],
       ports: [8089],
@@ -65,6 +66,7 @@ describe("MessageHandler", () => {
           "get-tab-web-content": true,
           "reorder-browser-tabs": true,
           "find-highlight-in-browser-tab": true,
+          "get-browser-bookmarks": true,
         },
         domainDenyList: [],
         ports: [8089],
@@ -139,6 +141,7 @@ describe("MessageHandler", () => {
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
             "find-highlight-in-browser-tab": true,
+            "get-browser-bookmarks": true,
           },
           domainDenyList: ["example.com", "another.com"],
           ports: [8089],
@@ -173,6 +176,7 @@ describe("MessageHandler", () => {
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
             "find-highlight-in-browser-tab": true,
+            "get-browser-bookmarks": true,
           },
           domainDenyList: ["example.com", "another.com"],
           ports: [8089],
@@ -395,6 +399,7 @@ describe("MessageHandler", () => {
             "get-tab-web-content": true,
             "reorder-browser-tabs": true,
             "find-highlight-in-browser-tab": true,
+            "get-browser-bookmarks": true,
           },
           domainDenyList: ["example.com"], // Add example.com to deny list
           ports: [8089],
@@ -547,6 +552,91 @@ describe("MessageHandler", () => {
           messageHandler.handleDecodedMessage(request)
         ).rejects.toThrow();
         expect(browser.find.find).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("get-bookmarks command", () => {
+      it("should get bookmarks and send formatted text to the server", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "get-bookmarks",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockBookmarks = [
+          {
+            id: "1",
+            title: "Root",
+            type: "folder",
+            children: [
+              {
+                id: "2",
+                title: "Work",
+                type: "folder",
+                children: [
+                  {
+                    id: "3",
+                    title: "GitHub",
+                    type: "bookmark",
+                    url: "https://github.com",
+                  },
+                ],
+              },
+              {
+                id: "4",
+                title: "Google",
+                type: "bookmark",
+                url: "https://google.com",
+              },
+            ],
+          },
+        ];
+        (browser.bookmarks.getTree as jest.Mock).mockResolvedValue(
+          mockBookmarks
+        );
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.bookmarks.getTree).toHaveBeenCalled();
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "bookmarks",
+          correlationId: "test-correlation-id",
+          bookmarksText: expect.stringContaining("[Folder] Root"),
+        });
+      });
+
+      it("should search bookmarks when query is provided", async () => {
+        // Arrange
+        const request: ServerMessageRequest = {
+          cmd: "get-bookmarks",
+          query: "GitHub",
+          correlationId: "test-correlation-id",
+        };
+
+        const mockSearchResults = [
+          {
+            id: "3",
+            title: "GitHub",
+            type: "bookmark",
+            url: "https://github.com",
+          },
+        ];
+        (browser.bookmarks.search as jest.Mock).mockResolvedValue(
+          mockSearchResults
+        );
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.bookmarks.search).toHaveBeenCalledWith("GitHub");
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "bookmarks",
+          correlationId: "test-correlation-id",
+          bookmarksText: expect.stringContaining("- GitHub - https://github.com"),
+        });
       });
     });
   });

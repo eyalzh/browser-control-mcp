@@ -46,6 +46,11 @@ export interface GroupTabsServerMessage extends ServerMessageBase {
   groupTitle: string;
 }
 
+export interface GetBookmarksServerMessage extends ServerMessageBase {
+  cmd: "get-bookmarks";
+  query?: string;
+}
+
 export type ServerMessage =
   | OpenTabServerMessage
   | CloseTabsServerMessage
@@ -54,6 +59,7 @@ export type ServerMessage =
   | GetTabContentServerMessage
   | ReorderTabsServerMessage
   | FindHighlightServerMessage
-  | GroupTabsServerMessage;
+  | GroupTabsServerMessage
+  | GetBookmarksServerMessage;
 
 export type ServerMessageRequest = ServerMessage & { correlationId: string };
