@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install mcp-server dependencies
+        run: npm install --prefix mcp-server
+
+      - name: Build MCP server bundle
+        run: npm run build --prefix mcp-server
+
+      - name: Verify bundle starts
+        run: |
+          timeout 3 node mcp-server/dist/bin.js &
+          sleep 1
+          kill %1 2>/dev/null || true
+
+      - name: Install extension dependencies
+        run: npm install --prefix firefox-extension
+
+      - name: Build Firefox extension
+        run: npm run build --prefix firefox-extension
+
+      - name: Run extension tests
+        run: npm test --prefix firefox-extension

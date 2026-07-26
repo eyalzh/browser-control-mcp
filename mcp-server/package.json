@@ -1,17 +1,24 @@
 {
-  "name": "mcp-server",
+  "name": "browser-control-mcp",
   "version": "1.5.1",
-  "main": "dist/server.js",
+  "description": "MCP server for AI assistants to control Firefox browser tabs, history, and web content",
+  "license": "MIT",
   "engines": {
     "node": ">=22.0.0"
   },
+  "main": "dist/server.js",
+  "bin": {
+    "browser-control-mcp": "dist/bin.js"
+  },
+  "files": [
+    "dist/bin.js"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "build": "esbuild bin.ts --bundle --platform=node --format=cjs --outfile=dist/bin.js",
+    "build:tsc": "tsc",
+    "start": "node dist/bin.js",
     "pack-dxt": "npx @anthropic-ai/dxt pack"
   },
-  "license": "MIT",
-  "description": "Browser Control MCP Server",
   "dependencies": {
     "@browser-control-mcp/common": "../common",
     "@modelcontextprotocol/sdk": "^1.7.0",
@@ -21,6 +28,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.0",
+    "esbuild": "^0.25.1",
     "typescript": "^5.8.2"
   }
 }

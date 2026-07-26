@@ -2,6 +2,7 @@
   "name": "browser-control-mcp",
   "version": "1.5.0",
   "private": true,
+  "bin": "cli.js",
   "scripts": {
     "postinstall": "npm install --prefix mcp-server && npm install --prefix firefox-extension",
     "build": "nx run-many --target=build --all --parallel"
