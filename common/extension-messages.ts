@@ -60,6 +60,14 @@ export interface TabGroupCreatedExtensionMessage extends ExtensionMessageBase {
   groupId: number;
 }
 
+export interface ScreenshotExtensionMessage extends ExtensionMessageBase {
+  resource: "screenshot";
+  tabId: number;
+  // Base64-encoded image, without the data-URL prefix
+  imageData: string;
+  mimeType: string;
+}
+
 export type ExtensionMessage =
   | TabContentExtensionMessage
   | TabsExtensionMessage
@@ -68,7 +76,8 @@ export type ExtensionMessage =
   | ReorderedTabsExtensionMessage
   | FindHighlightExtensionMessage
   | TabsClosedExtensionMessage
-  | TabGroupCreatedExtensionMessage;
+  | TabGroupCreatedExtensionMessage
+  | ScreenshotExtensionMessage;
 
 export interface ExtensionError {
   correlationId: string;

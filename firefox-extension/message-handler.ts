@@ -1,6 +1,10 @@
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
+import { hasCaptureConsent, markTabAsAwaitingConsent } from "./capture-consent";
+
+// Time to let a newly foregrounded tab paint before capturing it
+const TAB_PAINT_DELAY_MS = 250;
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -52,6 +56,15 @@ export class MessageHandler {
           req.isCollapsed,
           req.groupColor as browser.tabGroups.Color,
           req.groupTitle
+        );
+        break;
+      case "capture-screenshot":
+        await this.captureScreenshot(
+          req.correlationId,
+          req.tabId,
+          req.format,
+          req.quality,
+          req.scale
         );
         break;
       default:
@@ -302,6 +315,92 @@ export class MessageHandler {
     });
   }
 
+  private async captureScreenshot(
+    correlationId: string,
+    tabId: number,
+    format: "jpeg" | "png" = "jpeg",
+    quality: number = 70,
+    scale: number = 1
+  ): Promise<void> {
+    const tab = await browser.tabs.get(tabId);
+
+    if (tab.url && (await isDomainInDenyList(tab.url))) {
+      throw new Error(`Domain in tab URL is in the deny list`);
+    }
+
+    if (!hasCaptureConsent(tabId, tab.url)) {
+      await markTabAsAwaitingConsent(tabId);
+      throw new Error(
+        `The user has not authorized screenshots of tab ${tabId} ("${
+          tab.title ?? tab.url
+        }"). The extension's toolbar button is now marked with a "!" badge on that tab. ` +
+          `Ask the user to click the Browser Control MCP button in the Firefox toolbar while that tab is open, then try again. ` +
+          `The authorization covers only that tab, and ends when the tab navigates or closes.`
+      );
+    }
+
+    if (tab.windowId === undefined) {
+      throw new Error(`Tab ${tabId} does not belong to a window`);
+    }
+
+    // captureVisibleTab() captures whichever tab is active in the window, and activeTab is
+    // only granted for the tab the user clicked, so the target tab has to be foregrounded
+    // first. Restore the previous tab afterwards so the capture is not disruptive.
+    const restoreTabId = tab.active
+      ? undefined
+      : await this.activateTabForCapture(tabId, tab.windowId);
+
+    try {
+      let dataUrl: string;
+      try {
+        dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
+          format,
+          quality,
+          scale,
+        });
+      } catch (error) {
+        // The browser is the real enforcer of the activeTab grant, so it can still refuse
+        // even when the tracked consent looks valid.
+        throw new Error(
+          `Firefox refused to capture tab ${tabId}: ${
+            error instanceof Error ? error.message : String(error)
+          }. Capturing with per-tab authorization requires Firefox 126 or later. ` +
+            `Otherwise, ask the user to click the extension's toolbar button on that tab again.`
+        );
+      }
+      const { mimeType, imageData } = parseImageDataUrl(dataUrl);
+      await this.client.sendResourceToServer({
+        resource: "screenshot",
+        correlationId,
+        tabId,
+        imageData,
+        mimeType,
+      });
+    } finally {
+      if (restoreTabId !== undefined) {
+        try {
+          await browser.tabs.update(restoreTabId, { active: true });
+        } catch (error) {
+          console.error("Failed to restore the previously active tab:", error);
+        }
+      }
+    }
+  }
+
+  // Foregrounds the tab to be captured, returning the tab that was active before, if any.
+  private async activateTabForCapture(
+    tabId: number,
+    windowId: number
+  ): Promise<number | undefined> {
+    const [previouslyActive] = await browser.tabs.query({
+      active: true,
+      windowId,
+    });
+    await browser.tabs.update(tabId, { active: true });
+    await new Promise((resolve) => setTimeout(resolve, TAB_PAINT_DELAY_MS));
+    return previouslyActive?.id;
+  }
+
   private async groupTabs(
     correlationId: string,
     tabIds: number[],
@@ -325,4 +424,15 @@ export class MessageHandler {
       groupId: tabGroup.id,
     });
   }
+}
+
+function parseImageDataUrl(dataUrl: string): {
+  mimeType: string;
+  imageData: string;
+} {
+  const match = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
+  if (!match) {
+    throw new Error("The browser returned a screenshot in an unexpected format");
+  }
+  return { mimeType: match[1], imageData: match[2] };
 }

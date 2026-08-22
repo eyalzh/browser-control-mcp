@@ -11,6 +11,14 @@ const mockBrowser = {
     move: jest.fn(),
     update: jest.fn(),
     group: jest.fn(),
+    captureVisibleTab: jest.fn(),
+    onUpdated: { addListener: jest.fn() },
+    onRemoved: { addListener: jest.fn() },
+  },
+  browserAction: {
+    setBadgeText: jest.fn().mockResolvedValue(undefined),
+    setBadgeBackgroundColor: jest.fn().mockResolvedValue(undefined),
+    onClicked: { addListener: jest.fn() },
   },
   tabGroups: {
     update: jest.fn(),

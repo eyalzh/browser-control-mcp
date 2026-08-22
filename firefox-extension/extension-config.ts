@@ -49,6 +49,11 @@ export const AVAILABLE_TOOLS: ToolInfo[] = [
     id: "find-highlight-in-browser-tab",
     name: "Find and Highlight in Browser Tab",
     description: "Allows the MCP server to search for and highlight text in web pages"
+  },
+  {
+    id: "capture-tab-screenshot",
+    name: "Capture Tab Screenshot",
+    description: "Allows the MCP server to capture a screenshot of a tab, after you authorize that tab with the toolbar button"
   }
 ];
 
@@ -62,6 +67,7 @@ export const COMMAND_TO_TOOL_ID: Record<ServerMessageRequest["cmd"], string> = {
   "reorder-tabs": "reorder-browser-tabs",
   "find-highlight": "find-highlight-in-browser-tab",
   "group-tabs": "reorder-browser-tabs",
+  "capture-screenshot": "capture-tab-screenshot",
 };
 
 // Storage schema for tool settings

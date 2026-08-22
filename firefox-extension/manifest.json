@@ -7,7 +7,8 @@
         "tabs",
         "tabGroups",
         "history",
-        "storage"
+        "storage",
+        "activeTab"
     ],
     "optional_permissions": [
         "*://*/*",
@@ -15,6 +16,10 @@
     ],
     "background": {
       "scripts": ["dist/background.js"]
+    },
+    "browser_action": {
+      "default_icon": "assets/screenshot.svg",
+      "default_title": "Browser Control MCP: allow a screenshot of this tab"
     },
     "options_ui": {
       "page": "options.html"

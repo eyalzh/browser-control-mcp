@@ -82,6 +82,10 @@
         {
             "name": "find-highlight-in-browser-tab",
             "description": "Find and highlight text in a browser tab"
+        },
+        {
+            "name": "capture-tab-screenshot",
+            "description": "Capture a screenshot of the visible area of a browser tab (requires per-tab user consent)"
         }
     ]
 }

@@ -233,6 +233,54 @@ mcpServer.tool(
   }
 );
 
+mcpServer.tool(
+  "capture-tab-screenshot",
+  `
+    Capture a screenshot of the visible area of a browser tab, by tab ID.
+    The user must authorize each tab by clicking the extension's toolbar button while that tab is open.
+    If the tab is not authorized, this tool returns an error explaining what to ask the user to do; relay that
+    request to the user and retry afterwards. Authorization ends when the tab navigates or closes.
+    Capturing brings the tab to the foreground momentarily.
+  `,
+  {
+    tabId: z.number(),
+    format: z
+      .enum(["jpeg", "png"])
+      .default("jpeg")
+      .describe("Use png only when exact pixel fidelity matters, as it is much larger"),
+    quality: z
+      .number()
+      .int()
+      .min(10)
+      .max(100)
+      .default(70)
+      .describe("JPEG quality, ignored for png"),
+    scale: z
+      .number()
+      .min(0.1)
+      .max(2)
+      .default(1)
+      .describe("Image scale relative to CSS pixels, lower values produce smaller images"),
+  },
+  async ({ tabId, format, quality, scale }) => {
+    const screenshot = await browserApi.captureScreenshot(
+      tabId,
+      format,
+      quality,
+      scale
+    );
+    return {
+      content: [
+        {
+          type: "image",
+          data: screenshot.imageData,
+          mimeType: screenshot.mimeType,
+        },
+      ],
+    };
+  }
+);
+
 const browserApi = new BrowserAPI();
 browserApi.init().catch((err) => {
   console.error("Browser API init error", err);

@@ -7,12 +7,16 @@ import type {
   TabContentExtensionMessage,
   ServerMessageRequest,
   ExtensionError,
+  ScreenshotExtensionMessage,
 } from "@browser-control-mcp/common";
 import { isPortInUse } from "./util";
 import * as crypto from "crypto";
 
 const WS_DEFAULT_PORT = 8089;
 const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
+// Capturing may foreground the tab, wait for it to paint, encode the image and transfer a
+// payload orders of magnitude larger than the other responses.
+const SCREENSHOT_RESPONSE_TIMEOUT_MS = 10000;
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
@@ -184,6 +188,26 @@ export class BrowserAPI {
     return message.groupId;
   }
 
+  async captureScreenshot(
+    tabId: number,
+    format: "jpeg" | "png",
+    quality: number,
+    scale: number
+  ): Promise<ScreenshotExtensionMessage> {
+    const correlationId = this.sendMessageToExtension({
+      cmd: "capture-screenshot",
+      tabId,
+      format,
+      quality,
+      scale,
+    });
+    return await this.waitForResponse(
+      correlationId,
+      "screenshot",
+      SCREENSHOT_RESPONSE_TIMEOUT_MS
+    );
+  }
+
   private createSignature(payload: string): string {
     if (!this.sharedSecret) {
       throw new Error("Shared secret not initialized");
@@ -233,7 +257,8 @@ export class BrowserAPI {
 
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
     correlationId: string,
-    resource: T
+    resource: T,
+    timeoutMs: number = EXTENSION_RESPONSE_TIMEOUT_MS
   ): Promise<Extract<ExtensionMessage, { resource: T }>> {
     return new Promise<Extract<ExtensionMessage, { resource: T }>>(
       (resolve, reject) => {
@@ -245,7 +270,7 @@ export class BrowserAPI {
         setTimeout(() => {
           this.extensionRequestMap.delete(correlationId);
           reject("Timed out waiting for response");
-        }, EXTENSION_RESPONSE_TIMEOUT_MS);
+        }, timeoutMs);
       }
     );
   }

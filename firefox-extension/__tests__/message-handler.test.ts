@@ -2,6 +2,7 @@ import { MessageHandler } from "../message-handler";
 import { WebsocketClient } from "../client";
 import type { ServerMessageRequest } from "@browser-control-mcp/common";
 import { ExtensionConfig } from "../extension-config";
+import { grantCaptureConsent, revokeCaptureConsent } from "../capture-consent";
 
 // Mock the WebsocketClient
 jest.mock("../client", () => {
@@ -547,6 +548,174 @@ describe("MessageHandler", () => {
           messageHandler.handleDecodedMessage(request)
         ).rejects.toThrow();
         expect(browser.find.find).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("capture-screenshot command", () => {
+      const request: ServerMessageRequest = {
+        cmd: "capture-screenshot",
+        tabId: 123,
+        correlationId: "test-correlation-id",
+      };
+
+      beforeEach(() => {
+        revokeCaptureConsent(123);
+        (browser.tabs.captureVisibleTab as jest.Mock).mockResolvedValue(
+          "data:image/jpeg;base64,QUJD"
+        );
+      });
+
+      it("should refuse to capture a tab the user has not authorized", async () => {
+        // Arrange
+        const mockTab = {
+          id: 123,
+          url: "https://example.com",
+          title: "Example",
+          windowId: 1,
+          active: true,
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow(/has not authorized screenshots of tab 123/);
+        expect(browser.tabs.captureVisibleTab).not.toHaveBeenCalled();
+        // The toolbar button is badged so the user can see which tab is waiting
+        expect(browser.browserAction.setBadgeText).toHaveBeenCalledWith({
+          text: "!",
+          tabId: 123,
+        });
+      });
+
+      it("should treat consent as revoked once the tab has navigated", async () => {
+        // Arrange
+        grantCaptureConsent(123, "https://example.com/first");
+        const mockTab = {
+          id: 123,
+          url: "https://example.com/second",
+          title: "Example",
+          windowId: 1,
+          active: true,
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow(/has not authorized screenshots of tab 123/);
+        expect(browser.tabs.captureVisibleTab).not.toHaveBeenCalled();
+      });
+
+      it("should capture an authorized active tab and send the image to the server", async () => {
+        // Arrange
+        grantCaptureConsent(123, "https://example.com");
+        const mockTab = {
+          id: 123,
+          url: "https://example.com",
+          title: "Example",
+          windowId: 1,
+          active: true,
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.tabs.captureVisibleTab).toHaveBeenCalledWith(1, {
+          format: "jpeg",
+          quality: 70,
+          scale: 1,
+        });
+        // An already-active tab must not be re-activated
+        expect(browser.tabs.update).not.toHaveBeenCalled();
+        expect(mockClient.sendResourceToServer).toHaveBeenCalledWith({
+          resource: "screenshot",
+          correlationId: "test-correlation-id",
+          tabId: 123,
+          imageData: "QUJD",
+          mimeType: "image/jpeg",
+        });
+      });
+
+      it("should foreground a background tab and restore the previous one", async () => {
+        // Arrange
+        grantCaptureConsent(123, "https://example.com");
+        const mockTab = {
+          id: 123,
+          url: "https://example.com",
+          title: "Example",
+          windowId: 1,
+          active: false,
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+        (browser.tabs.query as jest.Mock).mockResolvedValue([{ id: 456 }]);
+
+        // Act
+        await messageHandler.handleDecodedMessage(request);
+
+        // Assert
+        expect(browser.tabs.query).toHaveBeenCalledWith({
+          active: true,
+          windowId: 1,
+        });
+        expect(browser.tabs.update).toHaveBeenNthCalledWith(1, 123, {
+          active: true,
+        });
+        expect(browser.tabs.update).toHaveBeenNthCalledWith(2, 456, {
+          active: true,
+        });
+        expect(browser.tabs.captureVisibleTab).toHaveBeenCalled();
+      });
+
+      it("should throw an error if tab URL domain is in deny list", async () => {
+        // Arrange
+        grantCaptureConsent(123, "https://example.com");
+        const configWithDenyList: ExtensionConfig = {
+          secret: "test-secret",
+          domainDenyList: ["example.com"],
+          ports: [8089],
+          auditLog: [],
+        };
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: configWithDenyList,
+        });
+
+        const mockTab = {
+          id: 123,
+          url: "https://example.com",
+          title: "Example",
+          windowId: 1,
+          active: true,
+        };
+        (browser.tabs.get as jest.Mock).mockResolvedValue(mockTab);
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Domain in tab URL is in the deny list");
+        expect(browser.tabs.captureVisibleTab).not.toHaveBeenCalled();
+      });
+
+      it("should throw an error if the tool is disabled in settings", async () => {
+        // Arrange
+        grantCaptureConsent(123, "https://example.com");
+        (browser.storage.local.get as jest.Mock).mockResolvedValue({
+          config: {
+            secret: "test-secret",
+            toolSettings: { "capture-tab-screenshot": false },
+            domainDenyList: [],
+            ports: [8089],
+            auditLog: [],
+          } as ExtensionConfig,
+        });
+
+        // Act & Assert
+        await expect(
+          messageHandler.handleDecodedMessage(request)
+        ).rejects.toThrow("Command 'capture-screenshot' is disabled");
+        expect(browser.tabs.captureVisibleTab).not.toHaveBeenCalled();
       });
     });
   });

@@ -14,6 +14,7 @@ The MCP server supports the following tools:
 - Read and search the browser's history
 - Read a webpage's text content and links (requires user consent)
 - Find and highlight text in a browser tab (requires user consent)
+- Capture a screenshot of a tab's visible area (requires user consent per tab)
 
 ## Example use-cases:
 
@@ -38,6 +39,7 @@ The MCP server and Firefox extension combo is designed to be more secure than we
 
 * It does not support web page modification, page interactions, or arbitrary scripting.
 * Reading webpage content requires the user's explicit consent in the browser for each domain. This is enforced at the extension's manifest level.
+* Screenshots require the user to authorize each individual tab by clicking the extension's toolbar button. The extension relies on the `activeTab` permission for this, so the authorization is enforced by Firefox itself and expires when the tab navigates or closes. The extension never requests broad host permissions for screenshots.
 * It uses a local-only connection with a shared secret between the MCP server and extension.
 * No remote data collection or tracking.
 * It provides an extension-side audit log for tool calls and tool enable/disable configuration.
