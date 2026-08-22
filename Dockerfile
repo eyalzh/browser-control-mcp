@@ -12,8 +12,8 @@ COPY common/ ./common/
 # Set working directory to mcp-server for installation
 WORKDIR /app/mcp-server
 
-# Install dependencies
-RUN npm install
+# Install dependencies from the committed lockfile
+RUN npm ci --no-audit --no-fund
 
 # Copy mcp-server source code
 COPY mcp-server/ ./
