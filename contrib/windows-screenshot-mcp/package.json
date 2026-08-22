@@ -1,0 +1,14 @@
+{
+  "name": "windows-screenshot-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Optional, standalone Windows-only companion MCP server: window screenshot, keyboard, click, and focus via OS automation. NOT part of the Browser Control extension and does not use its consent model.",
+  "main": "server.js",
+  "bin": {
+    "windows-screenshot-mcp": "server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  }
+}
