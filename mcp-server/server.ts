@@ -293,8 +293,8 @@ mcpServer.connect(transport).catch((err) => {
   process.exit(1);
 });
 
-process.stdin.on("close", () => {
-  browserApi.close();
+process.stdin.on("close", async () => {
+  await browserApi.close();
   mcpServer.close();
   process.exit(0);
 });

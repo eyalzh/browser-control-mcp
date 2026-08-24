@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node --test __tests__/*.test.mjs",
     "start": "node dist/server.js",
     "pack-dxt": "npx @anthropic-ai/dxt pack"
   },
