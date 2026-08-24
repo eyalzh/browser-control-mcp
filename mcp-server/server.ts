@@ -49,16 +49,28 @@ mcpServer.tool(
 
 mcpServer.tool(
   "get-list-of-open-tabs",
-  "Get the list of open tabs in the user's browser. Use offset and limit parameters for pagination when there are many tabs.",
+  "Get the list of open tabs in the user's browser. Use urlContains/titleContains to pinpoint tabs when there are many open, and offset/limit for pagination over the (optionally filtered) results.",
   {
+    urlContains: z.string().optional().describe("Case-insensitive substring to match against each tab's URL"),
+    titleContains: z.string().optional().describe("Case-insensitive substring to match against each tab's title"),
     offset: z.number().int().min(0).default(0).describe("Starting index for pagination (0-based, must be >= 0)"),
     limit: z.number().default(100).describe("Maximum number of tabs to return (default: 100, max: 500)"),
   },
-  async ({ offset, limit }) => {
+  async ({ urlContains, titleContains, offset, limit }) => {
     // Validate and cap the limit
     const effectiveLimit = Math.min(Math.max(1, limit), 500);
 
-    const openTabs = await browserApi.getTabList();
+    const allTabs = await browserApi.getTabList();
+    const openTabs = allTabs.filter((tab) => {
+      if (urlContains && !tab.url?.toLowerCase().includes(urlContains.toLowerCase())) {
+        return false;
+      }
+      if (titleContains && !tab.title?.toLowerCase().includes(titleContains.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+    const isFiltered = urlContains !== undefined || titleContains !== undefined;
     const totalTabs = openTabs.length;
 
     // Apply pagination
@@ -68,7 +80,7 @@ mcpServer.tool(
     // Add pagination info as the first content item
     const paginationInfo = {
       type: "text" as const,
-      text: `Showing tabs ${offset + 1}-${offset + paginatedTabs.length} of ${totalTabs} total tabs${hasMore ? ` (use offset=${offset + effectiveLimit} to see more)` : ''}`,
+      text: `Showing tabs ${offset + 1}-${offset + paginatedTabs.length} of ${totalTabs}${isFiltered ? " matching" : " total"} tabs${hasMore ? ` (use offset=${offset + effectiveLimit} to see more)` : ''}`,
     };
 
     const tabContent = paginatedTabs.map((tab) => {
