@@ -1,6 +1,9 @@
 import { MessageHandler } from "../message-handler";
 import { WebsocketClient } from "../client";
-import type { ServerMessageRequest } from "@browser-control-mcp/common";
+import type {
+  ServerMessageRequest,
+  TabContentExtensionMessage,
+} from "@browser-control-mcp/common";
 import { ExtensionConfig } from "../extension-config";
 import { grantCaptureConsent, revokeCaptureConsent } from "../capture-consent";
 
@@ -382,6 +385,41 @@ describe("MessageHandler", () => {
           links: [{ url: "https://example.com/page", text: "Page" }],
           totalLength: 12,
         });
+      });
+
+      it("should cap oversized tab content before sending it", async () => {
+        const request: ServerMessageRequest = {
+          cmd: "get-tab-content",
+          tabId: 123,
+          correlationId: "test-correlation-id",
+        };
+
+        (browser.tabs.get as jest.Mock).mockResolvedValue({
+          id: 123,
+          url: "https://example.com",
+        });
+        (browser.permissions.contains as jest.Mock).mockResolvedValue(true);
+        (browser.tabs.executeScript as jest.Mock).mockResolvedValue([
+          {
+            links: [
+              {
+                url: "https://example.com/page",
+                text: "😀".repeat(500_000),
+              },
+            ],
+            fullText: "Page content",
+            isTruncated: false,
+            totalLength: 12,
+          },
+        ]);
+
+        await messageHandler.handleDecodedMessage(request);
+
+        const sentMessage = mockClient.sendResourceToServer.mock
+          .calls[0][0] as TabContentExtensionMessage;
+        const responseBytes = Buffer.byteLength(JSON.stringify(sentMessage));
+        expect(responseBytes).toBeLessThanOrEqual(2_000_000);
+        expect(sentMessage.isTruncated).toBe(true);
       });
 
       it("should throw an error if tab URL domain is in deny list", async () => {

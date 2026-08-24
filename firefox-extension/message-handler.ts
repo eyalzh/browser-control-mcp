@@ -1,10 +1,14 @@
-import type { ServerMessageRequest } from "@browser-control-mcp/common";
+import type {
+  ServerMessageRequest,
+  TabContentExtensionMessage,
+} from "@browser-control-mcp/common";
 import { WebsocketClient } from "./client";
 import { isCommandAllowed, isDomainInDenyList, COMMAND_TO_TOOL_ID, addAuditLogEntry } from "./extension-config";
 import { hasCaptureConsent, markTabAsAwaitingConsent } from "./capture-consent";
 
 // Time to let a newly foregrounded tab paint before capturing it
 const TAB_PAINT_DELAY_MS = 250;
+const MAX_TAB_CONTENT_RESPONSE_BYTES = 2_000_000;
 
 export class MessageHandler {
   private client: WebsocketClient;
@@ -253,7 +257,7 @@ export class MessageHandler {
     `,
     });
     const { isTruncated, fullText, links, totalLength } = results[0];
-    await this.client.sendResourceToServer({
+    const message: TabContentExtensionMessage = {
       resource: "tab-content",
       tabId,
       correlationId,
@@ -261,7 +265,14 @@ export class MessageHandler {
       fullText,
       links,
       totalLength,
-    });
+    };
+    const responseSize = new Blob([JSON.stringify(message)]).size;
+    if (responseSize > MAX_TAB_CONTENT_RESPONSE_BYTES) {
+      message.fullText = fullText.substring(0, MAX_CONTENT_LENGTH);
+      message.links = [];
+      message.isTruncated = true;
+    }
+    await this.client.sendResourceToServer(message);
   }
 
   private async reorderTabs(
