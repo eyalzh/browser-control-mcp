@@ -2,6 +2,8 @@
 
 [![Firefox Add-on](./.github/addon_badge.svg)](https://addons.mozilla.org/en-US/firefox/addon/browser-control-mcp/)
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/eyalzh/browser-control-mcp)](https://archestra.ai/mcp-catalog/eyalzh__browser-control-mcp)
+
 An MCP server paired with a Firefox browser extension that provides AI assistants with access to tab management, browsing history, and webpage text content.
 
 ## Features
