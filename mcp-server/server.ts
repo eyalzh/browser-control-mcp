@@ -89,6 +89,25 @@ mcpServer.tool(
 );
 
 mcpServer.tool(
+  "get-tab-metadata",
+  "Get comprehensive metadata about a specific tab. Returns properties including: title, url, active (currently selected), pinned, hidden, discarded (unloaded to save memory), index (tab position), windowId, status (loading/complete), audible (playing audio), mutedInfo, width, height, incognito, favIconUrl, lastAccessed (timestamp), and more.",
+  { tabId: z.number() },
+  async ({ tabId }) => {
+    const metadata = await browserApi.getTabMetadata(tabId);
+
+    // Format the metadata as JSON for readability
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(metadata, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+mcpServer.tool(
   "get-recent-browser-history",
   "Get the list of recent browser history (to get all, don't use searchQuery)",
   { searchQuery: z.string().optional() },
