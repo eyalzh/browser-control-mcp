@@ -5,6 +5,7 @@
 import { ServerMessageRequest } from "@browser-control-mcp/common/server-messages";
 
 const DEFAULT_WS_PORT = 8089;
+const DEFAULT_PORTS = [8089, 8090, 8091];
 const AUDIT_LOG_SIZE_LIMIT = 100; // Maximum number of audit log entries to keep
 
 // Define all available tools with their IDs and descriptions
@@ -116,10 +117,26 @@ export async function getConfig(): Promise<ExtensionConfig> {
     config.toolSettings = getDefaultToolSettings();
   }
 
+  // Default/migrate the ports list. A missing list means it was never configured;
+  // a list of exactly [DEFAULT_WS_PORT] means it was defaulted under the old
+  // single-port scheme. Both are upgraded to the new multi-port default so
+  // Claude Desktop's multiple parallel server instances each get a free port.
+  // Any other stored list (including a deliberately-chosen [DEFAULT_WS_PORT]
+  // set after this migration ships, which looks identical - an accepted,
+  // unavoidable ambiguity) is left untouched.
+  let portsMigrated = false;
   if (!config.ports) {
-    config.ports = [DEFAULT_WS_PORT];
+    config.ports = [...DEFAULT_PORTS];
+    portsMigrated = true;
+  } else if (config.ports.length === 1 && config.ports[0] === DEFAULT_WS_PORT) {
+    config.ports = [...DEFAULT_PORTS];
+    portsMigrated = true;
   }
-  
+
+  if (portsMigrated) {
+    await saveConfig(config);
+  }
+
   return config;
 }
 

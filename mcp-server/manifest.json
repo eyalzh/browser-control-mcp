@@ -44,9 +44,9 @@
         },
         "port": {
             "type": "string",
-            "title": "Extension Port",
-            "description": "The port that the MCP server will use to communicate with the Firefox extension (default is 8089)",
-            "default": "8089",
+            "title": "Extension Port(s)",
+            "description": "One or more ports (comma-separated) the MCP server will try in order, e.g. \"8089,8090,8091\". Multiple ports matter because Claude Desktop may start several copies of this server at once. Default: 8089,8090,8091",
+            "default": "8089,8090,8091",
             "required": false
         }
     },

@@ -92,7 +92,7 @@ After installing the browser extension, add the following configuration to your 
             ],
             "env": {
                 "EXTENSION_SECRET": "<secret_on_firefox_extension_options_page>",
-                "EXTENSION_PORT": "8089" 
+                "EXTENSION_PORT": "8089,8090,8091" 
             }
         }
     }
@@ -100,7 +100,7 @@ After installing the browser extension, add the following configuration to your 
 ```
 Replace `/path/to/repo` with the correct path.
 
-Set the EXTENSION_SECRET to the value shown on the extension's preferences page in Firefox (you can access it at `about:addons`). You can also set the EXTENSION_PORT environment variable to specify the port that the MCP server will use to communicate with the extension (default is 8089).
+Set the EXTENSION_SECRET to the value shown on the extension's preferences page in Firefox (you can access it at `about:addons`). EXTENSION_PORT accepts a comma-separated list of ports; the server tries each in order and binds the first free one (default: 8089,8090,8091). A list is needed because Claude Desktop sometimes starts several copies of this MCP server in parallel - e.g. one for the main chat connection and a separate one for Cowork/Claude Code sessions, and again on reconnect - and each instance needs its own free port to bind to.
 
 It might take a few seconds for the MCP server to connect to the extension.
 
@@ -131,4 +131,5 @@ and use the following mcpServers configuration:
     }
 }
 ```
+This maps a single port since each Docker container is a separate instance with its own network namespace, so the multi-instance port collision described above doesn't apply here. If you do run several containers against the same extension, give each one a distinct `EXTENSION_PORT` (single value) and a matching distinct `-p` mapping.
 

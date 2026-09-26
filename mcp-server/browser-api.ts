@@ -9,10 +9,9 @@ import type {
   ExtensionError,
   ScreenshotExtensionMessage,
 } from "@browser-control-mcp/common";
-import { isPortInUse } from "./util";
 import * as crypto from "crypto";
 
-const WS_DEFAULT_PORT = 8089;
+const DEFAULT_PORTS = [8089, 8090, 8091];
 const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
 // Capturing may foreground the tab, wait for it to paint, encode the image and transfer a
 // payload orders of magnitude larger than the other responses.
@@ -37,19 +36,13 @@ export class BrowserAPI {
   > = new Map();
 
   async init() {
-    const { secret, port } = readConfig();
+    const { secret, ports } = readConfig();
     if (!secret) {
       throw new Error(
         "EXTENSION_SECRET env var missing. See the extension's options page."
       );
     }
     this.sharedSecret = secret;
-
-    if (await isPortInUse(port)) {
-      throw new Error(
-        `Configured port ${port} is already in use. Please configure a different port.`
-      );
-    }
 
     // Bind explicitly to both loopback addresses so Firefox connects regardless of how
     // it resolves "localhost". On Linux, getaddrinfo("localhost") often returns ::1
@@ -59,14 +52,46 @@ export class BrowserAPI {
     // interfaces), while accepting both IPv4 and IPv6 clients.
     const hosts = process.env.CONTAINERIZED ? ["0.0.0.0"] : ["127.0.0.1", "::1"];
 
-    for (const host of hosts) {
-      const wsServer = new WebSocket.Server({ host, port });
+    const skipped: number[] = [];
+    const attemptErrors: string[] = [];
+    let boundPort: number | null = null;
+    let boundServers: WebSocket.Server[] = [];
 
-      console.error(`Starting WebSocket server on ${host}:${port}`);
+    for (const port of ports) {
+      try {
+        boundServers = await bindAllHosts(hosts, port);
+        boundPort = port;
+        break;
+      } catch (err) {
+        skipped.push(port);
+        attemptErrors.push(
+          `${port}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+
+    if (boundPort === null) {
+      throw new Error(
+        `Could not bind the WebSocket server to any of the configured ports ` +
+          `(${ports.join(", ")}). Details: ${attemptErrors.join("; ")}. Add more ` +
+          `ports via the EXTENSION_PORT env var (comma-separated) and to the ` +
+          `"Ports" field on the Firefox extension's options page.`
+      );
+    }
+
+    console.error(
+      skipped.length > 0
+        ? `Using port ${boundPort} (${skipped.join(", ")} in use)`
+        : `Using port ${boundPort}`
+    );
+
+    for (const wsServer of boundServers) {
+      const host = wsServer.options.host;
+      console.error(`Starting WebSocket server on ${host}:${boundPort}`);
       wsServer.on("connection", async (connection) => {
         this.ws = connection;
 
-        console.error("WebSocket connection established on port", port);
+        console.error("WebSocket connection established on port", boundPort);
 
         this.ws.on("message", (message) => {
           const decoded = JSON.parse(message.toString());
@@ -83,7 +108,7 @@ export class BrowserAPI {
         });
       });
       wsServer.on("error", (error) => {
-        console.error(`WebSocket server error on ${host}:${port}:`, error);
+        console.error(`WebSocket server error on ${host}:${boundPort}:`, error);
       });
 
       this.wsServers.push(wsServer);
@@ -276,13 +301,79 @@ export class BrowserAPI {
   }
 }
 
+function parsePorts(raw: string | undefined): number[] {
+  if (!raw) {
+    return DEFAULT_PORTS;
+  }
+
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    throw new Error(
+      `Invalid EXTENSION_PORT value: "${raw}". Expected a comma-separated ` +
+        `list of ports between 1 and 65535 (e.g. "8089,8090,8091").`
+    );
+  }
+
+  const ports: number[] = [];
+  const seen = new Set<number>();
+  for (const part of parts) {
+    const port = Number(part);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new Error(
+        `Invalid port "${part}" in EXTENSION_PORT="${raw}". Each port must ` +
+          `be an integer between 1 and 65535.`
+      );
+    }
+    if (seen.has(port)) {
+      throw new Error(`Duplicate port ${port} in EXTENSION_PORT="${raw}".`);
+    }
+    seen.add(port);
+    ports.push(port);
+  }
+  return ports;
+}
+
 function readConfig() {
   return {
     secret: process.env.EXTENSION_SECRET,
-    port: process.env.EXTENSION_PORT
-      ? parseInt(process.env.EXTENSION_PORT, 10)
-      : WS_DEFAULT_PORT,
+    ports: parsePorts(process.env.EXTENSION_PORT),
   };
+}
+
+// Attempts to bind one host:port pair. Resolves on the real 'listening' event so
+// callers never rely on a separate isPortInUse-style pre-check, which is prone to a
+// TOCTOU race when several server instances start within the same millisecond.
+function bindWebSocketServer(host: string, port: number): Promise<WebSocket.Server> {
+  return new Promise((resolve, reject) => {
+    const wsServer = new WebSocket.Server({ host, port });
+    const onListening = () => {
+      wsServer.removeListener("error", onError);
+      resolve(wsServer);
+    };
+    const onError = (err: NodeJS.ErrnoException) => {
+      wsServer.removeListener("listening", onListening);
+      reject(err);
+    };
+    wsServer.once("listening", onListening);
+    wsServer.once("error", onError);
+  });
+}
+
+// Binds all hosts for a single candidate port. If any host fails, closes whichever
+// hosts already succeeded for this candidate so the caller can move to the next port.
+async function bindAllHosts(hosts: string[], port: number): Promise<WebSocket.Server[]> {
+  const bound: WebSocket.Server[] = [];
+  try {
+    for (const host of hosts) {
+      bound.push(await bindWebSocketServer(host, port));
+    }
+    return bound;
+  } catch (err) {
+    for (const wsServer of bound) {
+      wsServer.close();
+    }
+    throw err;
+  }
 }
 
 export function isErrorMessage(message: any): message is ExtensionError {
