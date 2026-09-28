@@ -80,6 +80,7 @@ export type ExtensionMessage =
   | ScreenshotExtensionMessage;
 
 export interface ExtensionError {
+  resource: "error";
   correlationId: string;
   errorMessage: string;
 }

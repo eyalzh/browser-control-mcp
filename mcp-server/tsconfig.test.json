@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "test-dist", "types": ["node"] },
+  "include": ["browser-api.ts", "util.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test-dist"]
+}
