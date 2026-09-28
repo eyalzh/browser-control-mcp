@@ -17,15 +17,28 @@ const EXTENSION_RESPONSE_TIMEOUT_MS = 1000;
 // Capturing may foreground the tab, wait for it to paint, encode the image and transfer a
 // payload orders of magnitude larger than the other responses.
 const SCREENSHOT_RESPONSE_TIMEOUT_MS = 10000;
+const HANDSHAKE_TIMEOUT_MS = 5000;
+const MAX_PENDING_CONNECTIONS = 8;
+const MAX_MESSAGE_BYTES = 16 * 1024 * 1024;
+const PROTOCOL = "browser-control-mcp:v2";
+
+interface AuthenticatedPeer {
+  socket: WebSocket;
+  nonce: string;
+  sent: number;
+  received: number;
+}
 
 interface ExtensionRequestResolver<T extends ExtensionMessage["resource"]> {
   resource: T;
   resolve: (value: Extract<ExtensionMessage, { resource: T }>) => void;
-  reject: (reason?: string) => void;
+  reject: (reason?: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 export class BrowserAPI {
-  private ws: WebSocket | null = null;
+  private peer: AuthenticatedPeer | null = null;
+  private connections = new Set<WebSocket>();
   private wsServers: WebSocket.Server[] = [];
   private sharedSecret: string | null = null;
 
@@ -60,27 +73,73 @@ export class BrowserAPI {
     const hosts = process.env.CONTAINERIZED ? ["0.0.0.0"] : ["127.0.0.1", "::1"];
 
     for (const host of hosts) {
-      const wsServer = new WebSocket.Server({ host, port });
+      const wsServer = new WebSocket.Server({ host, port, maxPayload: MAX_MESSAGE_BYTES });
 
       console.error(`Starting WebSocket server on ${host}:${port}`);
-      wsServer.on("connection", async (connection) => {
-        this.ws = connection;
-
-        console.error("WebSocket connection established on port", port);
-
-        this.ws.on("message", (message) => {
-          const decoded = JSON.parse(message.toString());
-          if (isErrorMessage(decoded)) {
-            this.handleExtensionError(decoded);
-            return;
+      wsServer.on("connection", (connection, request) => {
+        connection.on("error", () => connection.terminate());
+        const origin = request.headers.origin;
+        if ((origin && !/^moz-extension:\/\/[a-z0-9-]+$/i.test(origin)) ||
+            this.peer || this.connections.size >= MAX_PENDING_CONNECTIONS) {
+          connection.close(1008, "Connection refused");
+          return;
+        }
+        this.connections.add(connection);
+        const nonce = crypto.randomBytes(32).toString("hex");
+        let authenticated = false;
+        const timer = setTimeout(() => connection.terminate(), HANDSHAKE_TIMEOUT_MS);
+        connection.on("close", () => {
+          clearTimeout(timer);
+          this.connections.delete(connection);
+          if (this.peer?.socket === connection) {
+            this.peer = null;
+            this.rejectPendingRequests("Browser extension disconnected");
           }
-          const signature = this.createSignature(JSON.stringify(decoded.payload));
-          if (signature !== decoded.signature) {
-            console.error("Invalid message signature");
-            return;
-          }
-          this.handleDecodedExtensionMessage(decoded.payload);
         });
+        connection.on("message", (message, isBinary) => {
+          try {
+            if (isBinary) throw new Error("Binary frame");
+            const decoded: unknown = JSON.parse(message.toString());
+            if (!isRecord(decoded)) throw new Error("Invalid frame");
+            if (!authenticated) {
+              if (this.peer || decoded.type !== "authenticate" || decoded.nonce !== nonce ||
+                  typeof decoded.clientNonce !== "string" || !/^[a-f0-9]{64}$/.test(decoded.clientNonce) ||
+                  !this.verifySignature(JSON.stringify([PROTOCOL, "authenticate", "extension", nonce, decoded.clientNonce]), decoded.signature)) {
+                throw new Error("Authentication failed");
+              }
+              authenticated = true;
+              clearTimeout(timer);
+              this.peer = { socket: connection, nonce: `${nonce}:${decoded.clientNonce}`, sent: 0, received: 0 };
+              connection.send(JSON.stringify({
+                type: "ready", nonce, clientNonce: decoded.clientNonce,
+                signature: this.createSignature(JSON.stringify([PROTOCOL, "authenticate", "server", nonce, decoded.clientNonce])),
+              }));
+              return;
+            }
+            const peer = this.peer;
+            if (!peer || peer.socket !== connection || decoded.type !== "message" ||
+                !Number.isSafeInteger(decoded.sequence) || decoded.sequence !== peer.received + 1 ||
+                !this.verifySignature(JSON.stringify([PROTOCOL, "message", "extension", peer.nonce, decoded.sequence, decoded.payload]), decoded.signature)) {
+              throw new Error("Invalid authenticated frame");
+            }
+            const payload = decoded.payload;
+            if (!isRecord(payload) || typeof payload.correlationId !== "string" ||
+                payload.correlationId.length > 128 || typeof payload.resource !== "string") {
+              throw new Error("Invalid response");
+            }
+            peer.received++;
+            if (payload.resource === "error") {
+              if (!isErrorMessage(payload)) throw new Error("Invalid error response");
+              this.handleExtensionError(payload);
+            } else {
+              this.handleDecodedExtensionMessage(payload as unknown as ExtensionMessage);
+            }
+          } catch {
+            // Reject only the offending connection. Do not log incoming data.
+            connection.close(1008, "Invalid bridge message");
+          }
+        });
+        connection.send(JSON.stringify({ type: "challenge", version: 2, nonce }));
       });
       wsServer.on("error", (error) => {
         console.error(`WebSocket server error on ${host}:${port}:`, error);
@@ -91,6 +150,10 @@ export class BrowserAPI {
   }
 
   close() {
+    this.rejectPendingRequests("Browser bridge closed");
+    for (const connection of this.connections) connection.terminate();
+    this.connections.clear();
+    this.peer = null;
     for (const wsServer of this.wsServers) {
       wsServer.close();
     }
@@ -98,7 +161,8 @@ export class BrowserAPI {
   }
 
   getSelectedPort() {
-    return this.wsServers[0]?.options.port;
+    const address = this.wsServers[0]?.address();
+    return address && typeof address !== "string" ? address.port : undefined;
   }
 
   async openTab(url: string): Promise<number | undefined> {
@@ -217,42 +281,67 @@ export class BrowserAPI {
     return hmac.digest("hex");
   }
 
+  private verifySignature(payload: string, signature: unknown): boolean {
+    if (typeof signature !== "string" || !/^[a-f0-9]{64}$/.test(signature)) return false;
+    return crypto.timingSafeEqual(Buffer.from(this.createSignature(payload), "hex"), Buffer.from(signature, "hex"));
+  }
+
   private sendMessageToExtension(message: ServerMessage): string {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket is not open");
+    const peer = this.peer;
+    if (!peer || peer.socket.readyState !== WebSocket.OPEN) {
+      throw new Error("Browser extension is not authenticated");
     }
 
-    const correlationId = Math.random().toString(36).substring(2);
+    const correlationId = crypto.randomUUID();
     const req: ServerMessageRequest = { ...message, correlationId };
-    const payload = JSON.stringify(req);
-    const signature = this.createSignature(payload);
+    const sequence = ++peer.sent;
+    const signature = this.createSignature(JSON.stringify([PROTOCOL, "message", "server", peer.nonce, sequence, req]));
     const signedMessage = {
+      type: "message",
+      sequence,
       payload: req,
       signature: signature,
     };
 
     // Send the signed message to the extension
-    this.ws.send(JSON.stringify(signedMessage));
+    peer.socket.send(JSON.stringify(signedMessage), error => {
+      if (error) peer.socket.terminate();
+    });
 
     return correlationId;
   }
 
   private handleDecodedExtensionMessage(decoded: ExtensionMessage) {
     const { correlationId } = decoded;
-    const { resolve, resource } = this.extensionRequestMap.get(correlationId)!;
+    const pending = this.extensionRequestMap.get(correlationId);
+    // A normal response can arrive after its request has timed out.
+    if (!pending) return;
+    const { resolve, resource, reject, timer } = pending;
+    clearTimeout(timer);
+    this.extensionRequestMap.delete(correlationId);
     if (resource !== decoded.resource) {
-      console.error("Resource mismatch:", resource, decoded.resource);
+      reject(new Error("Unexpected browser response"));
       return;
     }
-    this.extensionRequestMap.delete(correlationId);
     resolve(decoded);
   }
 
   private handleExtensionError(decoded: ExtensionError) {
     const { correlationId, errorMessage } = decoded;
-    const { reject } = this.extensionRequestMap.get(correlationId)!;
+    const pending = this.extensionRequestMap.get(correlationId);
+    if (!pending) return;
+    const { reject, timer } = pending;
+    clearTimeout(timer);
     this.extensionRequestMap.delete(correlationId);
-    reject(errorMessage);
+    reject(new Error(errorMessage));
+  }
+
+  private rejectPendingRequests(message: string) {
+    for (const pending of this.extensionRequestMap.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error(message));
+    }
+    this.extensionRequestMap.clear();
   }
 
   private async waitForResponse<T extends ExtensionMessage["resource"]>(
@@ -262,15 +351,16 @@ export class BrowserAPI {
   ): Promise<Extract<ExtensionMessage, { resource: T }>> {
     return new Promise<Extract<ExtensionMessage, { resource: T }>>(
       (resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.extensionRequestMap.delete(correlationId);
+          reject(new Error("Timed out waiting for response"));
+        }, timeoutMs);
         this.extensionRequestMap.set(correlationId, {
           resolve: resolve as (value: ExtensionMessage) => void,
           resource,
           reject,
+          timer,
         });
-        setTimeout(() => {
-          this.extensionRequestMap.delete(correlationId);
-          reject("Timed out waiting for response");
-        }, timeoutMs);
       }
     );
   }
@@ -285,8 +375,13 @@ function readConfig() {
   };
 }
 
-export function isErrorMessage(message: any): message is ExtensionError {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+export function isErrorMessage(message: unknown): message is ExtensionError {
   return (
-    message.errorMessage !== undefined && message.correlationId !== undefined
+    isRecord(message) && message.resource === "error" &&
+    typeof message.errorMessage === "string" && typeof message.correlationId === "string"
   );
 }

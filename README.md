@@ -47,6 +47,19 @@ The MCP server and Firefox extension combo is designed to be more secure than we
 
 **Important note**: Browser Control MCP is still experimental. Use at your own risk. You should practice caution as with any other MCP server and authorize/monitor tool calls carefully.
 
+The extension and MCP server use bridge protocol v2. Build and reload **both** the Firefox extension
+and the MCP server together; older bridge versions are intentionally rejected.
+Both peers authenticate a fresh session before browser commands are sent, and
+every command, response, and error is signed with a session identifier and an
+ordered sequence number. One authenticated Firefox connection is allowed per
+server port. The connection remains local WebSocket traffic, not encrypted TLS.
+
+Existing extension settings are read automatically. New settings and audit-log
+entries use separate storage keys so logging cannot overwrite security choices.
+
+Run regression tests with `npm test --prefix mcp-server` and
+`npm test --prefix firefox-extension -- --runInBand` (Node.js 22 or later).
+
 ## Installation
 
 ### Option 1: Install the Firefox and Claude Desktop extensions
@@ -131,4 +144,3 @@ and use the following mcpServers configuration:
     }
 }
 ```
-

@@ -32,3 +32,17 @@ export async function getMessageSignature(
 
   return buf2hex(rawSignature);
 }
+
+export async function verifyMessageSignature(
+  message: string,
+  signature: unknown,
+  secretKey: string
+): Promise<boolean> {
+  if (!secretKey || typeof signature !== "string" || !/^[a-f0-9]{64}$/.test(signature)) return false;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", encoder.encode(secretKey), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+  );
+  const bytes = Uint8Array.from(signature.match(/../g)!, byte => parseInt(byte, 16));
+  return crypto.subtle.verify("HMAC", key, bytes, encoder.encode(message));
+}

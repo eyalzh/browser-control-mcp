@@ -108,28 +108,30 @@ export function getDefaultToolSettings(): ToolSettings {
  * @returns A Promise that resolves with the extension configuration
  */
 export async function getConfig(): Promise<ExtensionConfig> {
-  const configObj = await browser.storage.local.get("config");
-  const config: ExtensionConfig = configObj.config || { secret: "" };
-  
-  // Initialize toolSettings if it doesn't exist
-  if (!config.toolSettings) {
-    config.toolSettings = getDefaultToolSettings();
+  const stored = await browser.storage.local.get([
+    "config", "secret", "ports", "domainDenyList", "auditLog",
+    ...AVAILABLE_TOOLS.map(tool => toolStorageKey(tool.id)),
+  ]);
+  // Read older installations without rewriting the legacy object. Each new value
+  // has its own storage key, so writes from different extension pages cannot
+  // overwrite unrelated settings or restore a revoked permission.
+  const legacy: Partial<ExtensionConfig> = stored.config || {};
+  const toolSettings = { ...getDefaultToolSettings(), ...legacy.toolSettings };
+  for (const tool of AVAILABLE_TOOLS) {
+    const value = stored[toolStorageKey(tool.id)];
+    if (typeof value === "boolean") toolSettings[tool.id] = value;
   }
-
-  if (!config.ports) {
-    config.ports = [DEFAULT_WS_PORT];
-  }
-  
-  return config;
+  return {
+    secret: stored.secret ?? legacy.secret ?? "",
+    ports: stored.ports ?? legacy.ports ?? [DEFAULT_WS_PORT],
+    domainDenyList: stored.domainDenyList ?? legacy.domainDenyList ?? [],
+    auditLog: stored.auditLog ?? legacy.auditLog ?? [],
+    toolSettings,
+  };
 }
 
-/**
- * Saves the extension configuration to storage
- * @param config The configuration to save
- * @returns A Promise that resolves when the configuration is saved
- */
-export async function saveConfig(config: ExtensionConfig): Promise<void> {
-  await browser.storage.local.set({ config });
+function toolStorageKey(toolId: string): string {
+  return `toolEnabled:${toolId}`;
 }
 
 /**
@@ -146,10 +148,9 @@ export async function getSecret(): Promise<string> {
  * @returns A Promise that resolves with the new secret
  */
 export async function generateSecret(): Promise<string> {
-  const config = await getConfig();
-  config.secret = crypto.randomUUID();
-  await saveConfig(config);
-  return config.secret;
+  const secret = crypto.randomUUID();
+  await browser.storage.local.set({ secret });
+  return secret;
 }
 
 /**
@@ -184,16 +185,10 @@ export async function isCommandAllowed(command: ServerMessageRequest["cmd"]): Pr
  * @returns A Promise that resolves when the setting is saved
  */
 export async function setToolEnabled(toolId: string, enabled: boolean): Promise<void> {
-  const config = await getConfig();
-  
-  // Update the setting
-  if (!config.toolSettings) {
-    config.toolSettings = getDefaultToolSettings();
+  if (!AVAILABLE_TOOLS.some(tool => tool.id === toolId)) {
+    throw new Error("Unknown tool");
   }
-  config.toolSettings[toolId] = enabled;
-  
-  // Save back to storage
-  await saveConfig(config);
+  await browser.storage.local.set({ [toolStorageKey(toolId)]: enabled });
 }
 
 /**
@@ -220,9 +215,7 @@ export async function getDomainDenyList(): Promise<string[]> {
  * @returns A Promise that resolves when the setting is saved
  */
 export async function setDomainDenyList(domains: string[]): Promise<void> {
-  const config = await getConfig();
-  config.domainDenyList = domains;
-  await saveConfig(config);
+  await browser.storage.local.set({ domainDenyList: domains });
 }
 
 /**
@@ -266,9 +259,7 @@ export async function getPorts(): Promise<number[]> {
  * @returns A Promise that resolves when the setting is saved
  */
 export async function setPorts(ports: number[]): Promise<void> {
-  const config = await getConfig();
-  config.ports = ports;
-  await saveConfig(config);
+  await browser.storage.local.set({ ports });
 }
 
 /**
@@ -276,22 +267,15 @@ export async function setPorts(ports: number[]): Promise<void> {
  * @param entry The audit log entry to add
  * @returns A Promise that resolves when the entry is saved
  */
-export async function addAuditLogEntry(entry: AuditLogEntry): Promise<void> {
-  const config = await getConfig();
-  
-  if (!config.auditLog) {
-    config.auditLog = [];
-  }
-  
-  // Add the new entry at the beginning
-  config.auditLog.unshift(entry);
-  
-  // Keep only the last AUDIT_LOG_SIZE_LIMIT entries
-  if (config.auditLog.length > AUDIT_LOG_SIZE_LIMIT) {
-    config.auditLog = config.auditLog.slice(0, AUDIT_LOG_SIZE_LIMIT);
-  }
-  
-  await saveConfig(config);
+let auditWriteQueue: Promise<void> = Promise.resolve();
+
+export function addAuditLogEntry(entry: AuditLogEntry): Promise<void> {
+  const write = auditWriteQueue.then(async () => {
+    const auditLog = [entry, ...await getAuditLog()].slice(0, AUDIT_LOG_SIZE_LIMIT);
+    await browser.storage.local.set({ auditLog });
+  });
+  auditWriteQueue = write.catch(() => {});
+  return write;
 }
 
 /**
@@ -299,8 +283,8 @@ export async function addAuditLogEntry(entry: AuditLogEntry): Promise<void> {
  * @returns A Promise that resolves with the audit log entries
  */
 export async function getAuditLog(): Promise<AuditLogEntry[]> {
-  const config = await getConfig();
-  return config.auditLog || [];
+  const stored = await browser.storage.local.get(["auditLog", "config"]);
+  return stored.auditLog ?? stored.config?.auditLog ?? [];
 }
 
 /**
@@ -308,9 +292,7 @@ export async function getAuditLog(): Promise<AuditLogEntry[]> {
  * @returns A Promise that resolves when the audit log is cleared
  */
 export async function clearAuditLog(): Promise<void> {
-  const config = await getConfig();
-  config.auditLog = [];
-  await saveConfig(config);
+  await browser.storage.local.set({ auditLog: [] });
 }
 
 /**
